@@ -65,27 +65,6 @@ type ThanosDownsample struct {
 	Resolution int64 `json:"resolution"`
 }
 
-// InjectThanos sets Thanos meta to the block meta JSON and saves it to the disk.
-// NOTE: It should be used after writing any block by any Thanos component, otherwise we will miss crucial metadata.
-func InjectThanos(logger log.Logger, bdir string, meta Thanos, downsampledMeta *tsdb.BlockMeta) (*Meta, error) {
-	newMeta, err := Read(bdir)
-	if err != nil {
-		return nil, errors.Wrap(err, "read new meta")
-	}
-	newMeta.Thanos = meta
-
-	// While downsampling we need to copy original compaction.
-	if downsampledMeta != nil {
-		newMeta.Compaction = downsampledMeta.Compaction
-	}
-
-	if err := Write(logger, bdir, newMeta); err != nil {
-		return nil, errors.Wrap(err, "write new meta")
-	}
-
-	return newMeta, nil
-}
-
 // Write writes the given meta into <dir>/meta.json.
 func Write(logger log.Logger, dir string, meta *Meta) error {
 	// Make any changes to the file appear atomic.

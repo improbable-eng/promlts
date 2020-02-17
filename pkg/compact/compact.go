@@ -7,12 +7,15 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
+	"math"
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/dustin/go-humanize"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/oklog/ulid"
@@ -25,6 +28,7 @@ import (
 	"github.com/thanos-io/thanos/pkg/block/indexheader"
 	"github.com/thanos-io/thanos/pkg/block/metadata"
 	"github.com/thanos-io/thanos/pkg/compact/downsample"
+	"github.com/thanos-io/thanos/pkg/diskusage"
 	"github.com/thanos-io/thanos/pkg/objstore"
 )
 
@@ -199,6 +203,7 @@ func (s *Syncer) Groups() (res []*Group, err error) {
 				labels.FromMap(m.Thanos.Labels),
 				m.Thanos.Downsample.Resolution,
 				s.acceptMalformedIndex,
+				diskusage.Get,
 				s.enableVerticalCompaction,
 				s.metrics.compactions.WithLabelValues(groupKey),
 				s.metrics.compactionRunsStarted.WithLabelValues(groupKey),
@@ -348,6 +353,7 @@ type Group struct {
 	mtx                         sync.Mutex
 	blocks                      map[ulid.ULID]*metadata.Meta
 	acceptMalformedIndex        bool
+	getDiskUsage                func(string) (diskusage.Usage, error)
 	enableVerticalCompaction    bool
 	compactions                 prometheus.Counter
 	compactionRunsStarted       prometheus.Counter
@@ -364,6 +370,7 @@ func newGroup(
 	lset labels.Labels,
 	resolution int64,
 	acceptMalformedIndex bool,
+	du func(string) (diskusage.Usage, error),
 	enableVerticalCompaction bool,
 	compactions prometheus.Counter,
 	compactionRunsStarted prometheus.Counter,
@@ -381,6 +388,7 @@ func newGroup(
 		labels:                      lset,
 		resolution:                  resolution,
 		blocks:                      map[ulid.ULID]*metadata.Meta{},
+		getDiskUsage:                du,
 		acceptMalformedIndex:        acceptMalformedIndex,
 		enableVerticalCompaction:    enableVerticalCompaction,
 		compactions:                 compactions,
@@ -583,6 +591,49 @@ func (cg *Group) areBlocksOverlapping(include *metadata.Meta, excludeDirs ...str
 	return nil
 }
 
+// isEnoughDiskSpace checks with a heuristic if there is enough disk space in the compaction group
+// in the specified directory. It adds up the space requirements of all the blocks in the compaction group
+// and then adds the smallest one again. The specified directory needs to have at least that amount of available bytes.
+// Doing this check prevents (in most cases) from downloading a lot of data and only then finding out that there is not
+// enough space.
+func (cg *Group) isEnoughDiskSpace(ctx context.Context, dir string) error {
+	du, err := cg.getDiskUsage(dir)
+	if err != nil {
+		return errors.Wrap(err, "get disk usage")
+	}
+
+	var sumTakenByBlocks uint64
+	var smallestBlockBytes uint64 = math.MaxUint64
+
+	for blid := range cg.blocks {
+		var thisBlockBytes uint64
+		err := cg.bkt.Iter(ctx, blid.String(), func(d string) error {
+			if strings.HasSuffix(d, objstore.DirDelim) {
+				return nil
+			}
+			sz, err := cg.bkt.ObjectSize(ctx, d)
+			if err != nil {
+				return errors.Wrapf(err, "object size %s", d)
+			}
+			thisBlockBytes += sz
+			return nil
+		})
+		if err != nil {
+			return errors.Wrapf(err, "iter %s", blid.String())
+		}
+		sumTakenByBlocks += thisBlockBytes
+		if thisBlockBytes < smallestBlockBytes {
+			smallestBlockBytes = thisBlockBytes
+		}
+	}
+
+	neededBytes := smallestBlockBytes + sumTakenByBlocks
+	if neededBytes > du.AvailBytes {
+		return errors.Errorf("needed %v available space, got %v", humanize.Bytes(neededBytes), humanize.Bytes(du.AvailBytes))
+	}
+	return nil
+}
+
 // RepairIssue347 repairs the https://github.com/prometheus/tsdb/issues/347 issue when having issue347Error.
 func RepairIssue347(ctx context.Context, logger log.Logger, bkt objstore.Bucket, issue347Err error) error {
 	ie, ok := errors.Cause(issue347Err).(Issue347Error)
@@ -654,6 +705,11 @@ func (cg *Group) compact(ctx context.Context, dir string, comp tsdb.Compactor) (
 		}
 
 		overlappingBlocks = true
+	}
+
+	// Heuristic check if there is enough disk space.
+	if err := cg.isEnoughDiskSpace(ctx, dir); err != nil {
+		return false, ulid.ULID{}, halt(errors.Wrap(err, "pre-emptive disk space check"))
 	}
 
 	// Planning a compaction works purely based on the meta.json files in our future group's dir.
@@ -773,12 +829,17 @@ func (cg *Group) compact(ctx context.Context, dir string, comp tsdb.Compactor) (
 	index := filepath.Join(bdir, block.IndexFilename)
 	indexCache := filepath.Join(bdir, block.IndexCacheFilename)
 
-	newMeta, err := metadata.InjectThanos(cg.logger, bdir, metadata.Thanos{
+	meta, err := metadata.Read(bdir)
+	if err != nil {
+		return false, ulid.ULID{}, errors.Wrapf(err, "read meta from %s", bdir)
+	}
+	meta.Thanos = metadata.Thanos{
 		Labels:     cg.labels.Map(),
 		Downsample: metadata.ThanosDownsample{Resolution: cg.resolution},
 		Source:     metadata.CompactorSource,
-	}, nil)
-	if err != nil {
+	}
+
+	if err = metadata.Write(cg.logger, bdir, meta); err != nil {
 		return false, ulid.ULID{}, errors.Wrapf(err, "failed to finalize the block %s", bdir)
 	}
 
@@ -787,14 +848,14 @@ func (cg *Group) compact(ctx context.Context, dir string, comp tsdb.Compactor) (
 	}
 
 	// Ensure the output block is valid.
-	if err := block.VerifyIndex(cg.logger, index, newMeta.MinTime, newMeta.MaxTime); !cg.acceptMalformedIndex && err != nil {
+	if err := block.VerifyIndex(cg.logger, index, meta.MinTime, meta.MaxTime); !cg.acceptMalformedIndex && err != nil {
 		return false, ulid.ULID{}, halt(errors.Wrapf(err, "invalid result block %s", bdir))
 	}
 
 	// Ensure the output block is not overlapping with anything else,
 	// unless vertical compaction is enabled.
 	if !cg.enableVerticalCompaction {
-		if err := cg.areBlocksOverlapping(newMeta, plan...); err != nil {
+		if err := cg.areBlocksOverlapping(meta, plan...); err != nil {
 			return false, ulid.ULID{}, halt(errors.Wrapf(err, "resulted compacted block %s overlaps with something", bdir))
 		}
 	}

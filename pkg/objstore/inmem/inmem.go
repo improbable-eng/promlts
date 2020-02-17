@@ -148,8 +148,8 @@ func (b *Bucket) Exists(_ context.Context, name string) (bool, error) {
 // ObjectSize returns the size of the specified object.
 func (b *Bucket) ObjectSize(_ context.Context, name string) (uint64, error) {
 	b.mtx.RLock()
+	defer b.mtx.RUnlock()
 	file, ok := b.objects[name]
-	b.mtx.RUnlock()
 	if !ok {
 		return 0, errNotFound
 	}

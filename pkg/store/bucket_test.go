@@ -952,11 +952,15 @@ func uploadTestBlock(t testing.TB, tmpDir string, bkt objstore.Bucket) ulid.ULID
 	testutil.Ok(t, os.MkdirAll(filepath.Join(tmpDir, "tmp"), os.ModePerm))
 	id := createBlockFromHead(t, filepath.Join(tmpDir, "tmp"), h)
 
-	_, err = metadata.InjectThanos(log.NewNopLogger(), filepath.Join(tmpDir, "tmp", id.String()), metadata.Thanos{
+	bdir := filepath.Join(tmpDir, "tmp", id.String())
+	m, err := metadata.Read(bdir)
+	testutil.Ok(t, err)
+	m.Thanos = metadata.Thanos{
 		Labels:     labels.Labels{{Name: "ext1", Value: "1"}}.Map(),
 		Downsample: metadata.ThanosDownsample{Resolution: 0},
 		Source:     metadata.TestSource,
-	}, nil)
+	}
+	err = metadata.Write(log.NewNopLogger(), bdir, m)
 	testutil.Ok(t, err)
 	testutil.Ok(t, block.Upload(context.Background(), logger, bkt, filepath.Join(tmpDir, "tmp", id.String())))
 
@@ -1133,7 +1137,11 @@ func benchSeries_SeriesWithOneSample(t testutil.TB, totalSeries int) {
 		blockDir := filepath.Join(tmpDir, "tmp")
 		id := createBlockFromHead(t, blockDir, h)
 
-		meta, err := metadata.InjectThanos(log.NewNopLogger(), filepath.Join(blockDir, id.String()), thanosMeta, nil)
+		bdir := filepath.Join(blockDir, id.String())
+		m, err := metadata.Read(bdir)
+		testutil.Ok(t, err)
+		m.Thanos = thanosMeta
+		err = metadata.Write(log.NewNopLogger(), bdir, m)
 		testutil.Ok(t, err)
 		testutil.Ok(t, block.Upload(context.Background(), logger, bkt, filepath.Join(blockDir, id.String())))
 
@@ -1141,7 +1149,7 @@ func benchSeries_SeriesWithOneSample(t testutil.TB, totalSeries int) {
 			indexCache:  noopCache{},
 			logger:      logger,
 			bkt:         bkt,
-			meta:        meta,
+			meta:        m,
 			partitioner: gapBasedPartitioner{maxGapSize: partitionerMaxGapSize},
 			chunkObjs:   []string{filepath.Join(id.String(), "chunks", "000001")},
 			chunkPool:   chunkPool,

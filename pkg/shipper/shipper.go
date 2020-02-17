@@ -380,6 +380,7 @@ func (s *Shipper) upload(ctx context.Context, meta *metadata.Meta) error {
 	if err := metadata.Write(s.logger, updir, meta); err != nil {
 		return errors.Wrap(err, "write meta file")
 	}
+
 	return block.Upload(ctx, s.logger, s.bucket, updir)
 }
 

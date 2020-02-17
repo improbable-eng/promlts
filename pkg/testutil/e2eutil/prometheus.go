@@ -369,16 +369,23 @@ func createBlock(
 		return id, errors.Wrap(err, "write block")
 	}
 
-	if _, err = metadata.InjectThanos(log.NewNopLogger(), filepath.Join(dir, id.String()), metadata.Thanos{
+	bdir := filepath.Join(dir, id.String())
+	meta, err := metadata.Read(bdir)
+	if err != nil {
+		return id, errors.Wrap(err, "read meta")
+	}
+	meta.Thanos = metadata.Thanos{
 		Labels:     extLset.Map(),
 		Downsample: metadata.ThanosDownsample{Resolution: resolution},
 		Source:     metadata.TestSource,
-	}, nil); err != nil {
+	}
+
+	if err = metadata.Write(log.NewNopLogger(), bdir, meta); err != nil {
 		return id, errors.Wrap(err, "finalize block")
 	}
 
 	if !tombstones {
-		if err = os.Remove(filepath.Join(dir, id.String(), "tombstones")); err != nil {
+		if err = os.Remove(filepath.Join(bdir, "tombstones")); err != nil {
 			return id, errors.Wrap(err, "remove tombstones")
 		}
 	}

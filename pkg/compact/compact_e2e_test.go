@@ -439,11 +439,18 @@ func createEmptyBlock(dir string, mint int64, maxt int64, extLset labels.Labels,
 		return ulid.ULID{}, errors.Wrap(err, "saving meta.json")
 	}
 
-	if _, err = metadata.InjectThanos(log.NewNopLogger(), filepath.Join(dir, uid.String()), metadata.Thanos{
+	bdir := filepath.Join(dir, uid.String())
+	meta, err := metadata.Read(bdir)
+	if err != nil {
+		return ulid.ULID{}, errors.Wrap(err, "read meta")
+	}
+	meta.Thanos = metadata.Thanos{
 		Labels:     extLset.Map(),
 		Downsample: metadata.ThanosDownsample{Resolution: resolution},
 		Source:     metadata.TestSource,
-	}, nil); err != nil {
+	}
+
+	if err = metadata.Write(log.NewNopLogger(), bdir, meta); err != nil {
 		return ulid.ULID{}, errors.Wrap(err, "finalize block")
 	}
 

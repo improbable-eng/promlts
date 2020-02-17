@@ -72,11 +72,13 @@ func TestReaders(t *testing.T) {
 	testutil.Ok(t, err)
 	e2eutil.Copy(t, "./testdata/index_format_v1", filepath.Join(tmpDir, m.ULID.String()))
 
-	_, err = metadata.InjectThanos(log.NewNopLogger(), filepath.Join(tmpDir, m.ULID.String()), metadata.Thanos{
+	bdir := filepath.Join(tmpDir, m.ULID.String())
+	m.Thanos = metadata.Thanos{
 		Labels:     labels.Labels{{Name: "ext1", Value: "1"}}.Map(),
 		Downsample: metadata.ThanosDownsample{Resolution: 0},
 		Source:     metadata.TestSource,
-	}, &m.BlockMeta)
+	}
+	err = metadata.Write(log.NewNopLogger(), bdir, m)
 	testutil.Ok(t, err)
 	testutil.Ok(t, block.Upload(ctx, log.NewNopLogger(), bkt, filepath.Join(tmpDir, m.ULID.String())))
 
@@ -267,11 +269,13 @@ func prepareIndexV2Block(t testing.TB, tmpDir string, bkt objstore.Bucket) *meta
 	testutil.Ok(t, err)
 	e2eutil.Copy(t, "./testdata/index_format_v2", filepath.Join(tmpDir, m.ULID.String()))
 
-	_, err = metadata.InjectThanos(log.NewNopLogger(), filepath.Join(tmpDir, m.ULID.String()), metadata.Thanos{
+	m.Thanos = metadata.Thanos{
 		Labels:     labels.Labels{{Name: "ext1", Value: "1"}}.Map(),
 		Downsample: metadata.ThanosDownsample{Resolution: 0},
 		Source:     metadata.TestSource,
-	}, &m.BlockMeta)
+	}
+	bdir := filepath.Join(tmpDir, m.ULID.String())
+	err = metadata.Write(log.NewNopLogger(), bdir, m)
 	testutil.Ok(t, err)
 	testutil.Ok(t, block.Upload(context.Background(), log.NewNopLogger(), bkt, filepath.Join(tmpDir, m.ULID.String())))
 
