@@ -11,6 +11,9 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/prometheus/prometheus/discovery/file"
+	"github.com/thanos-io/thanos/pkg/store"
+
 	"github.com/fatih/structtag"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
@@ -102,6 +105,14 @@ func main() {
 	queryCfg.EndpointsConfig.FileSDConfigs = []http_util.FileSDConfig{http_util.FileSDConfig{}}
 	if err := generate([]query.Config{queryCfg}, "rule_query", *outputDir); err != nil {
 		level.Error(logger).Log("msg", "failed to generate", "type", "rule_query", "err", err)
+		os.Exit(1)
+	}
+
+	storeCfg := store.DefaultConfig()
+	storeCfg.EndpointsConfig.FileSDConfigs = []file.SDConfig{file.SDConfig{}}
+	storeCfg.TlsConfig = &store.TlsConfig{}
+	if err := generate([]store.Config{storeCfg}, "query_store", *outputDir); err != nil {
+		level.Error(logger).Log("msg", "failed to generate", "type", "query_store", "err", err)
 		os.Exit(1)
 	}
 	logger.Log("msg", "success")

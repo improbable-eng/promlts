@@ -327,6 +327,19 @@ Flags:
                                  prefixed with 'dns+' or 'dnssrv+' to detect
                                  store API servers through respective DNS
                                  lookups.
+      --store.config-file=<file-path>
+                                 Path to YAML file that contains store API
+                                 servers configuration. See format details:
+                                 https://thanos.io/components/query.md/#configuration.
+                                 If defined, it takes precedence over the
+                                 '--store' and '--store.sd-files' flags.
+      --store.config=<content>   Alternative to 'store.config-file' flag (lower
+                                 priority). Content of YAML file that contains
+                                 store API servers configuration. See format
+                                 details:
+                                 https://thanos.io/components/query.md/#configuration.
+                                 If defined, it takes precedence over the
+                                 '--store' and '--store.sd-files' flags.
       --store.sd-files=<path> ...
                                  Path to files that contain addresses of store
                                  API servers. The path can be a glob pattern
@@ -354,3 +367,25 @@ Flags:
                                  enabled. 0 disables timeout.
 
 ```
+## Configuration
+
+### Store API
+
+The `--store.config` and `--store.config-file` flags allow specifying multiple store endpoints.
+
+The configuration format is the following:
+
+[embedmd]:# (../flags/config_query_store.txt yaml)
+```yaml
+- name: default
+  tls_config:
+    cert_file: ""
+    key_file: ""
+    ca_file: ""
+    server_name: ""
+  static_configs: []
+  file_sd_configs:
+  - files: []
+```
+
+If `tls_config` is omitted or set to `null` then TLS will not be used. Configs must have a name and they must be unique.

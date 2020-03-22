@@ -6,10 +6,18 @@ package e2e_test
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"net/url"
+	"os"
+	"path/filepath"
 	"sort"
 	"testing"
 	"time"
+
+	"github.com/prometheus/prometheus/discovery/file"
+	"github.com/prometheus/prometheus/discovery/targetgroup"
+	"github.com/thanos-io/thanos/pkg/store"
+	"gopkg.in/yaml.v2"
 
 	"github.com/cortexproject/cortex/integration/e2e"
 	"github.com/pkg/errors"
@@ -62,6 +70,32 @@ func sortResults(res model.Vector) {
 	})
 }
 
+func createSDFile(sharedDir string, querierName string, fileSDStoreAddresses []string) (string, error) {
+	queryFileSDDir := filepath.Join(sharedDir, "data", "querier", querierName)
+	container := filepath.Join(e2e.ContainerSharedDir, "data", "querier", querierName)
+	if err := os.MkdirAll(queryFileSDDir, 0777); err != nil {
+		return "", errors.Wrap(err, "create query dir failed")
+	}
+
+	fileSD := []*targetgroup.Group{{}}
+	for _, a := range fileSDStoreAddresses {
+		fileSD[0].Targets = append(fileSD[0].Targets, model.LabelSet{model.AddressLabel: model.LabelValue(a)})
+	}
+
+	b, err := yaml.Marshal(fileSD)
+	if err != nil {
+		return "", err
+	}
+
+	if err := ioutil.WriteFile(queryFileSDDir+"/filesd.yaml", b, 0666); err != nil {
+		return "", errors.Wrap(err, "creating query SD config failed")
+	}
+
+	fmt.Println("filesd.yaml:", string(b))
+
+	return filepath.Join(container, "filesd.yaml"), nil
+}
+
 func TestQuery(t *testing.T) {
 	t.Parallel()
 
@@ -83,12 +117,32 @@ func TestQuery(t *testing.T) {
 	testutil.Ok(t, err)
 	testutil.Ok(t, s.StartAndWaitReady(prom1, sidecar1, prom2, sidecar2, prom3, sidecar3, prom4, sidecar4))
 
-	// Querier. Both fileSD and directly by flags.
-	q, err := e2ethanos.NewQuerier(
-		s.SharedDir(), "1",
-		[]string{sidecar1.GRPCNetworkEndpoint(), sidecar2.GRPCNetworkEndpoint(), receiver.GRPCNetworkEndpoint()},
-		[]string{sidecar3.GRPCNetworkEndpoint(), sidecar4.GRPCNetworkEndpoint()},
-	)
+	sdFilePath, err := createSDFile(s.SharedDir(), "1", []string{sidecar3.GRPCNetworkEndpoint(), sidecar4.GRPCNetworkEndpoint()})
+	testutil.Ok(t, err)
+
+	// Both fileSD and directly by separate configs.
+	queryCfg := []store.Config{
+		{
+			Name: "static",
+			EndpointsConfig: store.EndpointsConfig{
+				StaticAddresses: []string{sidecar1.GRPCNetworkEndpoint(), sidecar2.GRPCNetworkEndpoint(), receiver.GRPCNetworkEndpoint()},
+			},
+		},
+		{
+			Name: "filesd",
+			EndpointsConfig: store.EndpointsConfig{
+				FileSDConfigs: []file.SDConfig{
+					{
+						Files:           []string{sdFilePath},
+						RefreshInterval: model.Duration(time.Minute),
+					},
+				},
+			},
+		},
+	}
+
+	// Querier.
+	q, err := e2ethanos.NewQuerier("99", queryCfg)
 	testutil.Ok(t, err)
 	testutil.Ok(t, s.StartAndWaitReady(q))
 

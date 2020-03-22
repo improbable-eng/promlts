@@ -88,20 +88,24 @@ type storeSetNodeCollector struct {
 	nodeInfoDesc    *prometheus.Desc
 }
 
-func newStoreSetNodeCollector() *storeSetNodeCollector {
+func newStoreSetNodeCollector(configInstance string) *storeSetNodeCollector {
+	if configInstance == "" {
+		configInstance = "default"
+	}
+
 	return &storeSetNodeCollector{
 		storeNodes: map[component.StoreAPI]map[string]int{},
 		connectionsDesc: prometheus.NewDesc(
 			"thanos_store_nodes_grpc_connections",
 			"Number of gRPC connection to Store APIs. Opened connection means healthy store APIs available for Querier.",
-			[]string{"external_labels", "store_type"}, nil,
+			[]string{"external_labels", "store_type"}, map[string]string{"config_name": configInstance},
 		),
 		// TODO(bwplotka): Obsolete; Replaced by thanos_store_nodes_grpc_connections.
 		// Remove in next minor release.
 		nodeInfoDesc: prometheus.NewDesc(
 			"thanos_store_node_info",
 			"Deprecated, use thanos_store_nodes_grpc_connections instead.",
-			[]string{"external_labels"}, nil,
+			[]string{"external_labels"}, map[string]string{"config_name": configInstance},
 		),
 	}
 }
@@ -174,12 +178,13 @@ type StoreSet struct {
 // NewStoreSet returns a new set of stores from cluster peers and statically configured ones.
 func NewStoreSet(
 	logger log.Logger,
+	configInstance string,
 	reg *prometheus.Registry,
 	storeSpecs func() []StoreSpec,
 	dialOpts []grpc.DialOption,
 	unhealthyStoreTimeout time.Duration,
 ) *StoreSet {
-	storesMetric := newStoreSetNodeCollector()
+	storesMetric := newStoreSetNodeCollector(configInstance)
 	if reg != nil {
 		reg.MustRegister(storesMetric)
 	}

@@ -13,13 +13,12 @@ import (
 
 	"github.com/cortexproject/cortex/integration/e2e"
 	"github.com/pkg/errors"
-	"github.com/prometheus/common/model"
-	"github.com/prometheus/prometheus/discovery/targetgroup"
 	"github.com/prometheus/prometheus/pkg/relabel"
 	"github.com/thanos-io/thanos/pkg/alert"
 	"github.com/thanos-io/thanos/pkg/objstore/client"
 	"github.com/thanos-io/thanos/pkg/query"
 	"github.com/thanos-io/thanos/pkg/receive"
+	"github.com/thanos-io/thanos/pkg/store"
 	"gopkg.in/yaml.v2"
 )
 
@@ -98,8 +97,13 @@ func NewPrometheusWithSidecar(sharedDir string, netName string, name string, con
 	return prom, sidecar, nil
 }
 
-func NewQuerier(sharedDir string, name string, storeAddresses []string, fileSDStoreAddresses []string) (*Service, error) {
+func NewQuerier(name string, storeCfg []store.Config) (*Service, error) {
 	const replicaLabel = "replica"
+
+	storeCfgBytes, err := yaml.Marshal(storeCfg)
+	if err != nil {
+		return nil, errors.Wrapf(err, "generate store file: %v", storeCfg)
+	}
 
 	args := e2e.BuildArgs(map[string]string{
 		"--debug.name":            fmt.Sprintf("querier-%v", name),
@@ -107,37 +111,11 @@ func NewQuerier(sharedDir string, name string, storeAddresses []string, fileSDSt
 		"--grpc-grace-period":     "0s",
 		"--http-address":          ":80",
 		"--query.replica-label":   replicaLabel,
+		"--store.config":          string(storeCfgBytes),
 		"--store.sd-dns-interval": "5s",
 		"--log.level":             logLevel,
 		"--store.sd-interval":     "5s",
 	})
-	for _, addr := range storeAddresses {
-		args = append(args, "--store="+addr)
-	}
-
-	if len(fileSDStoreAddresses) > 0 {
-		queryFileSDDir := filepath.Join(sharedDir, "data", "querier", name)
-		container := filepath.Join(e2e.ContainerSharedDir, "data", "querier", name)
-		if err := os.MkdirAll(queryFileSDDir, 0777); err != nil {
-			return nil, errors.Wrap(err, "create query dir failed")
-		}
-
-		fileSD := []*targetgroup.Group{{}}
-		for _, a := range fileSDStoreAddresses {
-			fileSD[0].Targets = append(fileSD[0].Targets, model.LabelSet{model.AddressLabel: model.LabelValue(a)})
-		}
-
-		b, err := yaml.Marshal(fileSD)
-		if err != nil {
-			return nil, err
-		}
-
-		if err := ioutil.WriteFile(queryFileSDDir+"/filesd.yaml", b, 0666); err != nil {
-			return nil, errors.Wrap(err, "creating query SD config failed")
-		}
-
-		args = append(args, "--store.sd-files="+filepath.Join(container, "filesd.yaml"))
-	}
 
 	return NewService(
 		fmt.Sprintf("querier-%v", name),

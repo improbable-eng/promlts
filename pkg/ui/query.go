@@ -24,7 +24,7 @@ import (
 
 type Query struct {
 	*BaseUI
-	storeSet *query.StoreSet
+	getStoreStatus func() []query.StoreStatus
 
 	flagsMap map[string]string
 
@@ -43,19 +43,19 @@ type thanosVersion struct {
 	GoVersion string `json:"goVersion"`
 }
 
-func NewQueryUI(logger log.Logger, reg prometheus.Registerer, storeSet *query.StoreSet, flagsMap map[string]string) *Query {
+func NewQueryUI(logger log.Logger, reg prometheus.Registerer, getStoreStatus func() []query.StoreStatus, flagsMap map[string]string) *Query {
 	cwd, err := os.Getwd()
 	if err != nil {
 		cwd = "<error retrieving current working directory>"
 	}
 	return &Query{
-		BaseUI:   NewBaseUI(logger, "query_menu.html", queryTmplFuncs()),
-		storeSet: storeSet,
-		flagsMap: flagsMap,
-		cwd:      cwd,
-		birth:    time.Now(),
-		reg:      reg,
-		now:      model.Now,
+		BaseUI:         NewBaseUI(logger, "query_menu.html", queryTmplFuncs()),
+		getStoreStatus: getStoreStatus,
+		flagsMap:       flagsMap,
+		cwd:            cwd,
+		birth:          time.Now(),
+		reg:            reg,
+		now:            model.Now,
 	}
 }
 
@@ -125,7 +125,7 @@ func (q *Query) status(w http.ResponseWriter, r *http.Request) {
 func (q *Query) stores(w http.ResponseWriter, r *http.Request) {
 	prefix := GetWebPrefix(q.logger, q.flagsMap, r)
 	statuses := make(map[component.StoreAPI][]query.StoreStatus)
-	for _, status := range q.storeSet.GetStoreStatus() {
+	for _, status := range q.getStoreStatus() {
 		statuses[status.StoreType] = append(statuses[status.StoreType], status)
 	}
 

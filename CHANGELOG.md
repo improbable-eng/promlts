@@ -60,6 +60,7 @@ Since there are no consistency guarantees provided by some Object Storage provid
 - [#2145](https://github.com/thanos-io/thanos/pull/2145) Tracing: track query sent to prometheus via remote read api.
 - [#1848](https://github.com/thanos-io/thanos/pull/1848) Ruler: Return error messages when trigger reload with http.
 - [#2113](https://github.com/thanos-io/thanos/pull/2113) Bucket: Added `thanos bucket replicate`.
+- [#2226](https://github.com/thanos-io/thanos/pull/2226) Query: Add ability to mix Store TLS configuration with the `--store.config` amd `--store.config-file` CLI flags. See [documentation](docs/components/query.md/#configuration) for further information.
 
 ### Changed
 

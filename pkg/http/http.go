@@ -149,7 +149,7 @@ type FileSDConfig struct {
 	RefreshInterval model.Duration `yaml:"refresh_interval"`
 }
 
-func (c FileSDConfig) convert() (file.SDConfig, error) {
+func (c FileSDConfig) Convert() (file.SDConfig, error) {
 	var fileSDConfig file.SDConfig
 	b, err := yaml.Marshal(c)
 	if err != nil {
@@ -190,7 +190,7 @@ func NewClient(logger log.Logger, cfg EndpointsConfig, client *http.Client, prov
 
 	var discoverers []*file.Discovery
 	for _, sdCfg := range cfg.FileSDConfigs {
-		fileSDCfg, err := sdCfg.convert()
+		fileSDCfg, err := sdCfg.Convert()
 		if err != nil {
 			return nil, err
 		}

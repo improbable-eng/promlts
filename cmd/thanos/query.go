@@ -29,6 +29,7 @@ import (
 	"github.com/thanos-io/thanos/pkg/component"
 	"github.com/thanos-io/thanos/pkg/discovery/cache"
 	"github.com/thanos-io/thanos/pkg/discovery/dns"
+	"github.com/thanos-io/thanos/pkg/extflag"
 	"github.com/thanos-io/thanos/pkg/extgrpc"
 	"github.com/thanos-io/thanos/pkg/extprom"
 	extpromhttp "github.com/thanos-io/thanos/pkg/extprom/http"
@@ -78,6 +79,8 @@ func registerQuery(m map[string]setupFunc, app *kingpin.Application) {
 	stores := cmd.Flag("store", "Addresses of statically configured store API servers (repeatable). The scheme may be prefixed with 'dns+' or 'dnssrv+' to detect store API servers through respective DNS lookups.").
 		PlaceHolder("<store>").Strings()
 
+	storeConfig := extflag.RegisterPathOrContent(cmd, "store.config", "YAML file that contains store API servers configuration. See format details: https://thanos.io/components/query.md/#configuration. If defined, it takes precedence over the '--store' and '--store.sd-files' flags.", false)
+
 	fileSDFiles := cmd.Flag("store.sd-files", "Path to files that contain addresses of store API servers. The path can be a glob pattern (repeatable).").
 		PlaceHolder("<path>").Strings()
 
@@ -118,13 +121,23 @@ func registerQuery(m map[string]setupFunc, app *kingpin.Application) {
 			lookupStores[s] = struct{}{}
 		}
 
-		var fileSD *file.Discovery
+		storeConfigYAML, err := storeConfig.Content()
+		if err != nil {
+			return err
+		}
+		if len(*fileSDFiles) == 0 && len(*stores) == 0 && len(storeConfigYAML) == 0 {
+			return errors.New("no --store parameter was given")
+		}
+		if (len(*fileSDFiles) != 0 || len(*stores) != 0) && len(storeConfigYAML) != 0 {
+			return errors.New("--store/--store.sd-files and --store.config* parameters cannot be defined at the same time")
+		}
+
+		var fileSDConfig *file.SDConfig
 		if len(*fileSDFiles) > 0 {
-			conf := &file.SDConfig{
+			fileSDConfig = &file.SDConfig{
 				Files:           *fileSDFiles,
 				RefreshInterval: *fileSDInterval,
 			}
-			fileSD = file.NewDiscovery(conf, logger)
 		}
 
 		promql.SetDefaultEvaluationInterval(time.Duration(*defaultEvaluationInterval))
@@ -157,7 +170,8 @@ func registerQuery(m map[string]setupFunc, app *kingpin.Application) {
 			*stores,
 			*enableAutodownsampling,
 			*enablePartialResponse,
-			fileSD,
+			fileSDConfig,
+			storeConfigYAML,
 			time.Duration(*dnsSDInterval),
 			*dnsSDResolver,
 			time.Duration(*unhealthyStoreTimeout),
@@ -197,7 +211,8 @@ func runQuery(
 	storeAddrs []string,
 	enableAutodownsampling bool,
 	enablePartialResponse bool,
-	fileSD *file.Discovery,
+	fileSDConfig *file.SDConfig,
+	storeConfigYAML []byte,
 	dnsSDInterval time.Duration,
 	dnsSDResolver string,
 	unhealthyStoreTimeout time.Duration,
@@ -210,21 +225,41 @@ func runQuery(
 		Help: "The number of times a duplicated store addresses is detected from the different configs in query",
 	})
 
-	dialOpts, err := extgrpc.StoreClientGRPCOpts(logger, reg, tracer, secure, cert, key, caCert, serverName)
-	if err != nil {
-		return errors.Wrap(err, "building gRPC client")
+	var storesConfig []store.Config
+	if len(storeConfigYAML) > 0 {
+		var err error
+		storesConfig, err = store.LoadConfig(storeConfigYAML)
+		if err != nil {
+			return errors.Wrap(err, "loading store config")
+		}
+	} else {
+		storeConfig, err := store.NewConfig(storeAddrs, fileSDConfig, secure, cert, key, caCert, serverName)
+		if err != nil {
+			return errors.Wrap(err, "initialising stores config from individual flags")
+		}
+		storesConfig = []store.Config{storeConfig}
 	}
 
-	fileSDCache := cache.New()
-	dnsProvider := dns.NewProvider(
-		logger,
-		extprom.WrapRegistererWithPrefix("thanos_querier_store_apis_", reg),
-		dns.ResolverType(dnsSDResolver),
-	)
+	var storeSets []*query.StoreSet
+	for _, config := range storesConfig {
+		dialOpts, err := extgrpc.StoreClientGRPCOptsFromTlsConfig(logger, config.Name, reg, tracer, config.TlsConfig)
+		if err != nil {
+			return errors.Wrap(err, "building gRPC client")
+		}
 
-	var (
-		stores = query.NewStoreSet(
+		fileSDCache := cache.New()
+		dnsProvider := dns.NewProvider(
 			logger,
+			extprom.WrapRegistererWith(
+				map[string]string{"config_name": config.Name},
+				extprom.WrapRegistererWithPrefix("thanos_querier_store_apis_", reg),
+			),
+			dns.ResolverType(dnsSDResolver),
+		)
+
+		stores := query.NewStoreSet(
+			logger,
+			config.Name,
 			reg,
 			func() (specs []query.StoreSpec) {
 				// Add DNS resolved addresses from static flags and file SD.
@@ -239,7 +274,82 @@ func runQuery(
 			dialOpts,
 			unhealthyStoreTimeout,
 		)
-		proxy            = store.NewProxyStore(logger, reg, stores.Get, component.Query, selectorLset, storeResponseTimeout)
+		storeSets = append(storeSets, stores)
+
+		// Periodically update the store set with the addresses we see in our cluster.
+		{
+			ctx, cancel := context.WithCancel(context.Background())
+			g.Add(func() error {
+				return runutil.Repeat(5*time.Second, ctx.Done(), func() error {
+					stores.Update(ctx)
+					return nil
+				})
+			}, func(error) {
+				cancel()
+				stores.Close()
+			})
+		}
+		// Run File Service Discovery and update the store set when the files are modified.
+		if config.EndpointsConfig.FileSDConfigs != nil && len(config.EndpointsConfig.FileSDConfigs) > 0 {
+			fileSDUpdates := make(chan []*targetgroup.Group)
+
+			for _, fsdConfig := range config.EndpointsConfig.FileSDConfigs {
+				ctxRun, cancelRun := context.WithCancel(context.Background())
+				fileSD := file.NewDiscovery(&fsdConfig, logger)
+				g.Add(func() error {
+					fileSD.Run(ctxRun, fileSDUpdates)
+					return nil
+				}, func(error) {
+					cancelRun()
+				})
+			}
+
+			ctxUpdate, cancelUpdate := context.WithCancel(context.Background())
+			staticAddresses := config.EndpointsConfig.StaticAddresses
+			g.Add(func() error {
+				for {
+					select {
+					case update := <-fileSDUpdates:
+						// Discoverers sometimes send nil updates so need to check for it to avoid panics.
+						if update == nil {
+							continue
+						}
+						fileSDCache.Update(update)
+						stores.Update(ctxUpdate)
+						dnsProvider.Resolve(ctxUpdate, append(fileSDCache.Addresses(), staticAddresses...))
+					case <-ctxUpdate.Done():
+						return nil
+					}
+				}
+			}, func(error) {
+				cancelUpdate()
+				close(fileSDUpdates)
+			})
+		}
+		// Periodically update the addresses from static flags and file SD by resolving them using DNS SD if necessary.
+		{
+			ctx, cancel := context.WithCancel(context.Background())
+			staticAddresses := config.EndpointsConfig.StaticAddresses
+			g.Add(func() error {
+				return runutil.Repeat(dnsSDInterval, ctx.Done(), func() error {
+					dnsProvider.Resolve(ctx, append(fileSDCache.Addresses(), staticAddresses...))
+					return nil
+				})
+			}, func(error) {
+				cancel()
+			})
+		}
+	}
+
+	var (
+		allClients = func() []store.Client {
+			var ret []store.Client
+			for _, ss := range storeSets {
+				ret = append(ret, ss.Get()...)
+			}
+			return ret
+		}
+		proxy            = store.NewProxyStore(logger, reg, allClients, component.Query, selectorLset, storeResponseTimeout)
 		queryableCreator = query.NewQueryableCreator(logger, proxy)
 		engine           = promql.NewEngine(
 			promql.EngineOpts{
@@ -251,76 +361,14 @@ func runQuery(
 				Timeout:    queryTimeout,
 			},
 		)
+		grpcProbe    = prober.NewGRPC()
+		httpProbe    = prober.NewHTTP()
+		statusProber = prober.Combine(
+			httpProbe,
+			grpcProbe,
+			prober.NewInstrumentation(comp, logger, reg),
+		)
 	)
-	// Periodically update the store set with the addresses we see in our cluster.
-	{
-		ctx, cancel := context.WithCancel(context.Background())
-		g.Add(func() error {
-			return runutil.Repeat(5*time.Second, ctx.Done(), func() error {
-				stores.Update(ctx)
-				return nil
-			})
-		}, func(error) {
-			cancel()
-			stores.Close()
-		})
-	}
-	// Run File Service Discovery and update the store set when the files are modified.
-	if fileSD != nil {
-		var fileSDUpdates chan []*targetgroup.Group
-		ctxRun, cancelRun := context.WithCancel(context.Background())
-
-		fileSDUpdates = make(chan []*targetgroup.Group)
-
-		g.Add(func() error {
-			fileSD.Run(ctxRun, fileSDUpdates)
-			return nil
-		}, func(error) {
-			cancelRun()
-		})
-
-		ctxUpdate, cancelUpdate := context.WithCancel(context.Background())
-		g.Add(func() error {
-			for {
-				select {
-				case update := <-fileSDUpdates:
-					// Discoverers sometimes send nil updates so need to check for it to avoid panics.
-					if update == nil {
-						continue
-					}
-					fileSDCache.Update(update)
-					stores.Update(ctxUpdate)
-					dnsProvider.Resolve(ctxUpdate, append(fileSDCache.Addresses(), storeAddrs...))
-				case <-ctxUpdate.Done():
-					return nil
-				}
-			}
-		}, func(error) {
-			cancelUpdate()
-			close(fileSDUpdates)
-		})
-	}
-	// Periodically update the addresses from static flags and file SD by resolving them using DNS SD if necessary.
-	{
-		ctx, cancel := context.WithCancel(context.Background())
-		g.Add(func() error {
-			return runutil.Repeat(dnsSDInterval, ctx.Done(), func() error {
-				dnsProvider.Resolve(ctx, append(fileSDCache.Addresses(), storeAddrs...))
-				return nil
-			})
-		}, func(error) {
-			cancel()
-		})
-	}
-
-	grpcProbe := prober.NewGRPC()
-	httpProbe := prober.NewHTTP()
-	statusProber := prober.Combine(
-		httpProbe,
-		grpcProbe,
-		prober.NewInstrumentation(comp, logger, reg),
-	)
-
 	// Start query API + UI HTTP server.
 	{
 		router := route.New()
@@ -342,8 +390,15 @@ func runQuery(
 			"web.prefix-header":   webPrefixHeaderName,
 		}
 
+		getAllStoreStatuses := func() []query.StoreStatus {
+			var ret []query.StoreStatus
+			for _, stores := range storeSets {
+				ret = append(ret, stores.GetStoreStatus()...)
+			}
+			return ret
+		}
 		ins := extpromhttp.NewInstrumentationMiddleware(reg)
-		ui.NewQueryUI(logger, reg, stores, flagsMap).Register(router, ins)
+		ui.NewQueryUI(logger, reg, getAllStoreStatuses, flagsMap).Register(router, ins)
 
 		api := v1.NewAPI(logger, reg, engine, queryableCreator, enableAutodownsampling, enablePartialResponse, replicaLabels, instantDefaultMaxSourceResolution)
 
