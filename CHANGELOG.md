@@ -315,6 +315,7 @@ Highlights:
 - [#2980](https://github.com/thanos-io/thanos/pull/2980) Bucket Viewer: Migrate block viewer to React.
 - [#2725](https://github.com/thanos-io/thanos/pull/2725) Add bucket index operation durations: `thanos_bucket_store_cached_series_fetch_duration_seconds` and `thanos_bucket_store_cached_postings_fetch_duration_seconds`.
 - [#2931](https://github.com/thanos-io/thanos/pull/2931) Query: Allow passing a `storeMatch[]` to select matching stores when debugging the querier. See [documentation](https://thanos.io/tip/components/query.md/#store-filtering)
+- [#1906](https://github.com/thanos-io/thanos/pull/1906) Add docker images support for arm64 arch.
 
 ### Changed
 

@@ -1,0 +1,8 @@
+ARG OS="linux"
+ARG ARCH="amd64"
+FROM quay.io/prometheus/busybox-${OS}-${ARCH}:latest
+LABEL maintainer="The Thanos Authors"
+
+COPY .build/${OS}-${ARCH}/thanos /bin/thanos
+
+ENTRYPOINT [ "/bin/thanos" ]

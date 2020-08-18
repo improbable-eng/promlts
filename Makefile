@@ -21,6 +21,12 @@ else ifeq ($(arch), armv8)
 else
     echo >&2 "only support amd64 or arm64 arch" && exit 1
 endif
+DOCKER_ARCHS       ?= amd64 arm64
+# Generate two target: docker-xxx-amd64, docker-xxx-arm64.
+# Run make docker-xxx -n to see the result with dry run.
+BUILD_DOCKER_ARCHS = $(addprefix docker-build-,$(DOCKER_ARCHS))
+TEST_DOCKER_ARCHS  = $(addprefix docker-test-,$(DOCKER_ARCHS))
+PUSH_DOCKER_ARCHS  = $(addprefix docker-push-,$(DOCKER_ARCHS))
 
 # Ensure everything works even if GOPATH is not set, which is often the case.
 # The `go env GOPATH` will work for all cases for Go 1.8+.
@@ -160,9 +166,30 @@ docker-multi-stage:
 	@echo ">> building docker image 'thanos' with Dockerfile.multi-stage"
 	@docker build -f Dockerfile.multi-stage -t "thanos" --build-arg BASE_DOCKER_SHA=$(BASE_DOCKER_SHA) .
 
-.PHONY: docker-push
+# docker-build builds docker images with multiple architectures.
+.PHONY: docker-build $(BUILD_DOCKER_ARCHS)
+docker-build: $(BUILD_DOCKER_ARCHS)
+$(BUILD_DOCKER_ARCHS): docker-build-%:
+	@docker build -t "$(DOCKER_IMAGE_REPO)-linux-$*:$(DOCKER_IMAGE_TAG)" \
+		--build-arg ARCH="$*" --build-arg OS="linux" -f Dockerfile.multi-arch .
+
+.PHONY: docker-test $(TEST_DOCKER_ARCHS)
+docker-test: $(TEST_DOCKER_ARCHS)
+$(TEST_DOCKER_ARCHS): docker-test-%:
+	@echo ">> testing image"
+	@docker run "$(DOCKER_IMAGE_REPO)-linux-$*:$(DOCKER_IMAGE_TAG)" --help
+
+# docker-manifest push docker manifest to support multiple architectures.
+.PHONY: docker-manifest
+docker-manifest:
+	@echo ">> creating and pushing manifest"
+	@DOCKER_CLI_EXPERIMENTAL=enabled docker manifest create -a "$(DOCKER_IMAGE_REPO):$(DOCKER_IMAGE_TAG)" $(foreach ARCH,$(DOCKER_ARCHS),$(DOCKER_IMAGE_REPO)-linux-$(ARCH):$(DOCKER_IMAGE_TAG))
+	@DOCKER_CLI_EXPERIMENTAL=enabled docker manifest push "$(DOCKER_IMAGE_REPO):$(DOCKER_IMAGE_TAG)"
+
+.PHONY: docker-push $(PUSH_DOCKER_ARCHS)
 docker-push: ## Pushes 'thanos' docker image build to "$(DOCKER_IMAGE_REPO):$(DOCKER_IMAGE_TAG)".
-docker-push:
+docker-push: $(PUSH_DOCKER_ARCHS)
+$(PUSH_DOCKER_ARCHS): docker-push-%:
 	@echo ">> pushing image"
 	@docker tag "thanos" "$(DOCKER_IMAGE_REPO):$(DOCKER_IMAGE_TAG)"
 	@docker push "$(DOCKER_IMAGE_REPO):$(DOCKER_IMAGE_TAG)"
