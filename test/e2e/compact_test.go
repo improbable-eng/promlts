@@ -416,9 +416,15 @@ func TestCompactWithStoreGateway(t *testing.T) {
 		testutil.Ok(t, objstore.UploadDir(ctx, logger, bkt, path.Join(dir, id.String()), id.String()))
 	}
 
-	svcConfig := client.BucketConfig{
+	svcConfig := client.TestBucketConfig{
 		Type: client.S3,
-		Config: s3.Config{
+		Config: struct {
+			Bucket    string `yaml:"bucket"`
+			AccessKey string `yaml:"access_key"`
+			SecretKey string `yaml:"secret_key"`
+			Endpoint  string `yaml:"endpoint"`
+			Insecure  bool   `yaml:"insecure"`
+		}{
 			Bucket:    bucket,
 			AccessKey: e2edb.MinioAccessKey,
 			SecretKey: e2edb.MinioSecretKey,

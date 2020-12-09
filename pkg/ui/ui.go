@@ -27,6 +27,7 @@ var (
 		"/alerts",
 		"/config",
 		"/flags",
+		"/configfiles",
 		"/graph",
 		"/rules",
 		"/service-discovery",

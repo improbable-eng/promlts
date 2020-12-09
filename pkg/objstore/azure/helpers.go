@@ -31,7 +31,7 @@ func init() {
 }
 
 func getContainerURL(ctx context.Context, conf Config) (blob.ContainerURL, error) {
-	c, err := blob.NewSharedKeyCredential(conf.StorageAccountName, conf.StorageAccountKey)
+	c, err := blob.NewSharedKeyCredential(conf.StorageAccountName, string(conf.StorageAccountKey))
 	if err != nil {
 		return blob.ContainerURL{}, err
 	}

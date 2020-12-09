@@ -45,16 +45,15 @@ In Kubernetes it is as easy as (on Thanos sidecar example):
 
 Current object storage client implementations:
 
-| Provider                                                                                           | Maturity           | Aimed For             | Auto-tested on CI | Maintainers             |
-| -------------------------------------------------------------------------------------------------- | ------------------ | --------------------- | ----------------- | ----------------------- |
-| [Google Cloud Storage](./storage.md#gcs)                                                           | Stable             | Production Usage      | yes               | @bwplotka               |
-| [AWS/S3](./storage.md#s3) (and all S3-compatible storages e.g disk-based [Minio](https://min.io/)) | Stable             | Production Usage      | yes               | @bwplotka               |
-| [Azure Storage Account](./storage.md#azure)                                                        | Stable             | Production Usage      | no                | @vglafirov              |
-| [OpenStack Swift](./storage.md#openstack-swift)                                                    | Beta (working PoC) | Production Usage      | yes               | @sudhi-vm               |
-| [Tencent COS](./storage.md#tencent-cos)                                                            | Beta               | Production Usage      | no                | @jojohappy              |
-| [AliYun OSS](./storage.md#aliyun-oss)                                                              | Beta               | Production Usage      | no                | @shaulboozhiao,@wujinhu |
-| [Local Filesystem](./storage.md#filesystem)                                                        | Stable             | Testing and Demo only | yes               | @bwplotka               |
-
+| Provider             | Maturity | Aimed For | Auto-tested on CI | Maintainers |
+|----------------------|-------------------|-----------|---------------|
+| [Google Cloud Storage](./storage.md#gcs) | Stable | Production Usage | yes | @bwplotka   |
+| [AWS/S3](./storage.md#s3) (and all S3-compatible storages e.g disk-based [Minio](https://min.io/)) | Stable | Production Usage | yes | @bwplotka  |
+| [Azure Storage Account](./storage.md#azure) | Stable| Production Usage | no | @vglafirov   |
+| [OpenStack Swift](./storage.md#openstack-swift) | Beta (working PoC) | Production Usage  | yes  | @sudhi-vm |
+| [Tencent COS](./storage.md#tencent-cos) | Beta | Production Usage  | no | @jojohappy |
+| [AliYun OSS](./storage.md#aliyun-oss) | Beta | Production Usage | no  | @shaulboozhiao,@wujinhu |
+| [Local Filesystem](./storage.md#filesystem) | Stable | Testing and Demo only | yes | @bwplotka |
 
 **Missing support to some object storage?** Check out [how to add your client section](#how-to-add-a-new-client-to-thanos)
 
@@ -78,7 +77,7 @@ config:
   access_key: ""
   insecure: false
   signature_version2: false
-  secret_key: ""
+  secret_key: null
   put_user_metadata: {}
   http_config:
     idle_conn_timeout: 1m30s
@@ -323,7 +322,7 @@ Config file format is the following:
 type: AZURE
 config:
   storage_account: ""
-  storage_account_key: ""
+  storage_account_key: null
   container: ""
   endpoint: ""
   max_retries: 0
@@ -346,7 +345,7 @@ config:
   user_domain_name: ""
   user_domain_id: ""
   user_id: ""
-  password: ""
+  password: null
   domain_id: ""
   domain_name: ""
   project_id: ""
@@ -370,7 +369,7 @@ config:
   bucket: ""
   region: ""
   app_id: ""
-  secret_key: ""
+  secret_key: null
   secret_id: ""
 ```
 
@@ -389,7 +388,7 @@ config:
   endpoint: ""
   bucket: ""
   access_key_id: ""
-  access_key_secret: ""
+  access_key_secret: null
 ```
 
 Use --objstore.config-file to reference to this configuration file.

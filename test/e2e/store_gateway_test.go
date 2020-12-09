@@ -42,9 +42,15 @@ func TestStoreGateway(t *testing.T) {
 	m := e2edb.NewMinio(8080, "thanos")
 	testutil.Ok(t, s.StartAndWaitReady(m))
 
-	s1, err := e2ethanos.NewStoreGW(s.SharedDir(), "1", client.BucketConfig{
+	s1, err := e2ethanos.NewStoreGW(s.SharedDir(), "1", client.TestBucketConfig{
 		Type: client.S3,
-		Config: s3.Config{
+		Config: struct {
+			Bucket    string `yaml:"bucket"`
+			AccessKey string `yaml:"access_key"`
+			SecretKey string `yaml:"secret_key"`
+			Endpoint  string `yaml:"endpoint"`
+			Insecure  bool   `yaml:"insecure"`
+		}{
 			Bucket:    "thanos",
 			AccessKey: e2edb.MinioAccessKey,
 			SecretKey: e2edb.MinioSecretKey,

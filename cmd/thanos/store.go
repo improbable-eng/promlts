@@ -36,6 +36,7 @@ import (
 	storecache "github.com/thanos-io/thanos/pkg/store/cache"
 	"github.com/thanos-io/thanos/pkg/tls"
 	"github.com/thanos-io/thanos/pkg/ui"
+	"github.com/thanos-io/thanos/pkg/ui/config"
 )
 
 const fetcherConcurrency = 32
@@ -219,7 +220,10 @@ func runStore(
 	if err != nil {
 		return err
 	}
-
+	confContentYamlStr, err := config.ReplaceSecret(confContentYaml)
+	if err != nil {
+		return err
+	}
 	bkt, err := client.NewBucket(logger, confContentYaml, reg, component.String())
 	if err != nil {
 		return errors.Wrap(err, "create bucket client")
@@ -249,6 +253,14 @@ func runStore(
 	indexCacheContentYaml, err := indexCacheConfig.Content()
 	if err != nil {
 		return errors.Wrap(err, "get content of index cache configuration")
+	}
+
+	// Add config files content to config files map.
+	configFilesMap := map[string]string{
+		"Object Store Configuration":     string(confContentYamlStr),
+		"Index Cache Configuration":      string(indexCacheContentYaml),
+		"Caching Bucket Configuration":   string(cachingBucketConfigYaml),
+		"Selector Relabel Configuration": string(relabelContentYaml),
 	}
 
 	// Ensure we close up everything properly.
@@ -381,7 +393,7 @@ func runStore(
 			return logging.NoLogCall
 		})}
 		logMiddleware := logging.NewHTTPServerMiddleware(logger, opts...)
-		api := blocksAPI.NewBlocksAPI(logger, "", flagsMap)
+		api := blocksAPI.NewBlocksAPI(logger, "", flagsMap, configFilesMap)
 		api.Register(r.WithPrefix("/api/v1"), tracer, logger, ins, logMiddleware)
 
 		metaFetcher.UpdateOnChange(func(blocks []metadata.Meta, err error) {

@@ -260,3 +260,7 @@ button.execute-btn {
   width: 100px;
   padding: 5px;
 }
+
+.config-file-cell {
+  white-space: pre;
+}

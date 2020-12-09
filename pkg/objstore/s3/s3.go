@@ -25,6 +25,7 @@ import (
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	"github.com/minio/minio-go/v7/pkg/encrypt"
 	"github.com/pkg/errors"
+	"github.com/prometheus/common/config"
 	"github.com/prometheus/common/model"
 	"github.com/prometheus/common/version"
 	"github.com/thanos-io/thanos/pkg/objstore"
@@ -65,7 +66,7 @@ type Config struct {
 	AccessKey          string            `yaml:"access_key"`
 	Insecure           bool              `yaml:"insecure"`
 	SignatureV2        bool              `yaml:"signature_version2"`
-	SecretKey          string            `yaml:"secret_key"`
+	SecretKey          config.Secret     `yaml:"secret_key"`
 	PutUserMetadata    map[string]string `yaml:"put_user_metadata"`
 	HTTPConfig         HTTPConfig        `yaml:"http_config"`
 	TraceConfig        TraceConfig       `yaml:"trace"`
@@ -196,7 +197,7 @@ func NewBucketWithConfig(logger log.Logger, config Config, component string) (*B
 		chain = []credentials.Provider{wrapCredentialsProvider(&credentials.Static{
 			Value: credentials.Value{
 				AccessKeyID:     config.AccessKey,
-				SecretAccessKey: config.SecretKey,
+				SecretAccessKey: string(config.SecretKey),
 				SignerType:      credentials.SignatureV4,
 			},
 		})}
@@ -471,7 +472,7 @@ func configFromEnv() Config {
 		Bucket:    os.Getenv("S3_BUCKET"),
 		Endpoint:  os.Getenv("S3_ENDPOINT"),
 		AccessKey: os.Getenv("S3_ACCESS_KEY"),
-		SecretKey: os.Getenv("S3_SECRET_KEY"),
+		SecretKey: config.Secret(os.Getenv("S3_SECRET_KEY")),
 	}
 
 	c.Insecure, _ = strconv.ParseBool(os.Getenv("S3_INSECURE"))

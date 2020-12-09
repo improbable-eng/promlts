@@ -16,6 +16,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/pkg/errors"
+	"github.com/prometheus/common/config"
 	"github.com/thanos-io/thanos/pkg/objstore"
 	yaml "gopkg.in/yaml.v2"
 )
@@ -26,11 +27,11 @@ const (
 
 // Config Azure storage configuration.
 type Config struct {
-	StorageAccountName string `yaml:"storage_account"`
-	StorageAccountKey  string `yaml:"storage_account_key"`
-	ContainerName      string `yaml:"container"`
-	Endpoint           string `yaml:"endpoint"`
-	MaxRetries         int    `yaml:"max_retries"`
+	StorageAccountName string        `yaml:"storage_account"`
+	StorageAccountKey  config.Secret `yaml:"storage_account_key"`
+	ContainerName      string        `yaml:"container"`
+	Endpoint           string        `yaml:"endpoint"`
+	MaxRetries         int           `yaml:"max_retries"`
 }
 
 // Bucket implements the store.Bucket interface against Azure APIs.
@@ -312,7 +313,7 @@ func NewTestBucket(t testing.TB, component string) (objstore.Bucket, func(), err
 
 	conf := &Config{
 		StorageAccountName: os.Getenv("AZURE_STORAGE_ACCOUNT"),
-		StorageAccountKey:  os.Getenv("AZURE_STORAGE_ACCESS_KEY"),
+		StorageAccountKey:  config.Secret(os.Getenv("AZURE_STORAGE_ACCESS_KEY")),
 		ContainerName:      objstore.CreateTemporaryTestBucketName(t),
 	}
 

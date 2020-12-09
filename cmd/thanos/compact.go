@@ -13,6 +13,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/thanos-io/thanos/pkg/ui/config"
+
 	"github.com/alecthomas/units"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
@@ -176,19 +178,30 @@ func runCompact(
 		return err
 	}
 
+	confContentYamlStr, err := config.ReplaceSecret(confContentYaml)
+	if err != nil {
+		return err
+	}
+
 	bkt, err := client.NewBucket(logger, confContentYaml, reg, component.String())
 	if err != nil {
 		return err
 	}
 
-	relabelContentYaml, err := conf.selectorRelabelConf.Content()
+	reliabelContentYaml, err := conf.selectorRelabelConf.Content()
 	if err != nil {
 		return errors.Wrap(err, "get content of relabel configuration")
 	}
 
-	relabelConfig, err := block.ParseRelabelConfig(relabelContentYaml, block.SelectorSupportedRelabelActions)
+	relabelConfig, err := block.ParseRelabelConfig(reliabelContentYaml, block.SelectorSupportedRelabelActions)
 	if err != nil {
 		return err
+	}
+
+	// Add config content to configs map.
+	configFilesMap := map[string]string{
+		"Object Store Configuration":      string(confContentYamlStr),
+		"Selector Reliable Configuration": string(reliabelContentYaml),
 	}
 
 	// Ensure we close up everything properly.
@@ -230,7 +243,7 @@ func runCompact(
 		"/loaded",
 		component,
 	)
-	api := blocksAPI.NewBlocksAPI(logger, conf.label, flagsMap)
+	api := blocksAPI.NewBlocksAPI(logger, conf.label, flagsMap, configFilesMap)
 	noCompactMarkerFilter := compact.NewGatherNoCompactionMarkFilter(logger, bkt)
 	var sy *compact.Syncer
 	{

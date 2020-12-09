@@ -6,6 +6,8 @@ package azure
 import (
 	"testing"
 
+	"github.com/prometheus/common/config"
+
 	"github.com/thanos-io/thanos/pkg/testutil"
 )
 
@@ -84,11 +86,12 @@ func TestConfig_validate(t *testing.T) {
 			wantEndpoint: azureDefaultEndpoint,
 		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			conf := &Config{
 				StorageAccountName: tt.fields.StorageAccountName,
-				StorageAccountKey:  tt.fields.StorageAccountKey,
+				StorageAccountKey:  config.Secret(tt.fields.StorageAccountKey),
 				ContainerName:      tt.fields.ContainerName,
 				Endpoint:           tt.fields.Endpoint,
 				MaxRetries:         tt.fields.MaxRetries,

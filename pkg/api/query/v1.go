@@ -97,7 +97,7 @@ func NewQueryAPI(
 	gate gate.Gate,
 ) *QueryAPI {
 	return &QueryAPI{
-		baseAPI:         api.NewBaseAPI(logger, flagsMap),
+		baseAPI:         api.NewBaseAPI(logger, flagsMap, make(map[string]string)),
 		logger:          logger,
 		queryEngine:     qe,
 		queryableCreate: c,

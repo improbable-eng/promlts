@@ -32,9 +32,9 @@ type BlocksInfo struct {
 }
 
 // NewBlocksAPI creates a simple API to be used by Thanos Block Viewer.
-func NewBlocksAPI(logger log.Logger, label string, flagsMap map[string]string) *BlocksAPI {
+func NewBlocksAPI(logger log.Logger, label string, flagsMap map[string]string, configFilesMap map[string]string) *BlocksAPI {
 	return &BlocksAPI{
-		baseAPI: api.NewBaseAPI(logger, flagsMap),
+		baseAPI: api.NewBaseAPI(logger, flagsMap, configFilesMap),
 		logger:  logger,
 		globalBlocksInfo: &BlocksInfo{
 			Blocks: []metadata.Meta{},

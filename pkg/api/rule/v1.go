@@ -38,9 +38,10 @@ func NewRuleAPI(
 	ruleGroups rules.UnaryClient,
 	activeAlerts alertsRetriever,
 	flagsMap map[string]string,
+	configFilesMap map[string]string,
 ) *RuleAPI {
 	return &RuleAPI{
-		baseAPI:    api.NewBaseAPI(logger, flagsMap),
+		baseAPI:    api.NewBaseAPI(logger, flagsMap, configFilesMap),
 		logger:     logger,
 		ruleGroups: ruleGroups,
 		alerts:     activeAlerts,

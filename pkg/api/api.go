@@ -124,22 +124,24 @@ func SetCORS(w http.ResponseWriter) {
 type ApiFunc func(r *http.Request) (interface{}, []error, *ApiError)
 
 type BaseAPI struct {
-	logger      log.Logger
-	flagsMap    map[string]string
-	runtimeInfo RuntimeInfoFn
-	buildInfo   *ThanosVersion
-	Now         func() time.Time
+	logger         log.Logger
+	flagsMap       map[string]string
+	configFilesMap map[string]string
+	runtimeInfo    RuntimeInfoFn
+	buildInfo      *ThanosVersion
+	Now            func() time.Time
 }
 
 // NewBaseAPI returns a new initialized BaseAPI type.
-func NewBaseAPI(logger log.Logger, flagsMap map[string]string) *BaseAPI {
+func NewBaseAPI(logger log.Logger, flagsMap map[string]string, configFilesMap map[string]string) *BaseAPI {
 
 	return &BaseAPI{
-		logger:      logger,
-		flagsMap:    flagsMap,
-		runtimeInfo: GetRuntimeInfoFunc(logger),
-		buildInfo:   BuildInfo,
-		Now:         time.Now,
+		logger:         logger,
+		flagsMap:       flagsMap,
+		configFilesMap: configFilesMap,
+		runtimeInfo:    GetRuntimeInfoFunc(logger),
+		buildInfo:      BuildInfo,
+		Now:            time.Now,
 	}
 }
 
@@ -150,6 +152,7 @@ func (api *BaseAPI) Register(r *route.Router, tracer opentracing.Tracer, logger 
 	r.Options("/*path", instr("options", api.options))
 
 	r.Get("/status/flags", instr("status_flags", api.flags))
+	r.Get("/status/configfiles", instr("status_configfiles", api.configFiles))
 	r.Get("/status/runtimeinfo", instr("status_runtime", api.serveRuntimeInfo))
 	r.Get("/status/buildinfo", instr("status_build", api.serveBuildInfo))
 }
@@ -160,6 +163,10 @@ func (api *BaseAPI) options(r *http.Request) (interface{}, []error, *ApiError) {
 
 func (api *BaseAPI) flags(r *http.Request) (interface{}, []error, *ApiError) {
 	return api.flagsMap, nil, nil
+}
+
+func (api *BaseAPI) configFiles(r *http.Request) (interface{}, []error, *ApiError) {
+	return api.configFilesMap, nil, nil
 }
 
 func (api *BaseAPI) serveRuntimeInfo(r *http.Request) (interface{}, []error, *ApiError) {

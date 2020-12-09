@@ -21,6 +21,7 @@ import (
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v2"
 
+	"github.com/prometheus/common/config"
 	"github.com/thanos-io/thanos/pkg/objstore"
 )
 
@@ -28,20 +29,20 @@ import (
 const DirDelim = "/"
 
 type SwiftConfig struct {
-	AuthUrl           string `yaml:"auth_url"`
-	Username          string `yaml:"username"`
-	UserDomainName    string `yaml:"user_domain_name"`
-	UserDomainID      string `yaml:"user_domain_id"`
-	UserId            string `yaml:"user_id"`
-	Password          string `yaml:"password"`
-	DomainId          string `yaml:"domain_id"`
-	DomainName        string `yaml:"domain_name"`
-	ProjectID         string `yaml:"project_id"`
-	ProjectName       string `yaml:"project_name"`
-	ProjectDomainID   string `yaml:"project_domain_id"`
-	ProjectDomainName string `yaml:"project_domain_name"`
-	RegionName        string `yaml:"region_name"`
-	ContainerName     string `yaml:"container_name"`
+	AuthUrl           string        `yaml:"auth_url"`
+	Username          string        `yaml:"username"`
+	UserDomainName    string        `yaml:"user_domain_name"`
+	UserDomainID      string        `yaml:"user_domain_id"`
+	UserId            string        `yaml:"user_id"`
+	Password          config.Secret `yaml:"password"`
+	DomainId          string        `yaml:"domain_id"`
+	DomainName        string        `yaml:"domain_name"`
+	ProjectID         string        `yaml:"project_id"`
+	ProjectName       string        `yaml:"project_name"`
+	ProjectDomainID   string        `yaml:"project_domain_id"`
+	ProjectDomainName string        `yaml:"project_domain_name"`
+	RegionName        string        `yaml:"region_name"`
+	ContainerName     string        `yaml:"container_name"`
 }
 
 type Container struct {
@@ -194,7 +195,7 @@ func authOptsFromConfig(sc *SwiftConfig) gophercloud.AuthOptions {
 		IdentityEndpoint: sc.AuthUrl,
 		Username:         sc.Username,
 		UserID:           sc.UserId,
-		Password:         sc.Password,
+		Password:         string(sc.Password),
 		DomainID:         sc.DomainId,
 		DomainName:       sc.DomainName,
 		TenantID:         sc.ProjectID,
@@ -244,8 +245,22 @@ func (c *Container) deleteContainer(name string) error {
 	return containers.Delete(c.client, name).Err
 }
 
-func configFromEnv() SwiftConfig {
-	c := SwiftConfig{
+type testSwiftConfig struct {
+	AuthUrl           string `yaml:"auth_url"`
+	Username          string `yaml:"username"`
+	Password          string `yaml:"password"`
+	RegionName        string `yaml:"region_name"`
+	ContainerName     string `yaml:"container_name"`
+	ProjectID         string `yaml:"project_id"`
+	ProjectName       string `yaml:"project_name"`
+	UserDomainID      string `yaml:"user_domain_id"`
+	UserDomainName    string `yaml:"user_domain_name"`
+	ProjectDomainID   string `yaml:"project_domain_id"`
+	ProjectDomainName string `yaml:"project_domain_name"`
+}
+
+func configFromEnv() testSwiftConfig {
+	c := testSwiftConfig{
 		AuthUrl:           os.Getenv("OS_AUTH_URL"),
 		Username:          os.Getenv("OS_USERNAME"),
 		Password:          os.Getenv("OS_PASSWORD"),
@@ -263,7 +278,7 @@ func configFromEnv() SwiftConfig {
 }
 
 // validateForTests checks to see the config options for tests are set.
-func validateForTests(conf SwiftConfig) error {
+func validateForTests(conf testSwiftConfig) error {
 	if conf.AuthUrl == "" ||
 		conf.Username == "" ||
 		conf.Password == "" ||

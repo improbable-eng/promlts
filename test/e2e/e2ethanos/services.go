@@ -321,7 +321,7 @@ receivers:
 	return s, nil
 }
 
-func NewStoreGW(sharedDir string, name string, bucketConfig client.BucketConfig, relabelConfig ...relabel.Config) (*Service, error) {
+func NewStoreGW(sharedDir string, name string, bucketConfig client.TestBucketConfig, relabelConfig ...relabel.Config) (*Service, error) {
 	dir := filepath.Join(sharedDir, "data", "store", name)
 	container := filepath.Join(e2e.ContainerSharedDir, "data", "store", name)
 	if err := os.MkdirAll(dir, 0777); err != nil {
@@ -366,7 +366,7 @@ func NewStoreGW(sharedDir string, name string, bucketConfig client.BucketConfig,
 	return store, nil
 }
 
-func NewCompactor(sharedDir string, name string, bucketConfig client.BucketConfig, relabelConfig []relabel.Config, extArgs ...string) (*e2e.HTTPService, error) {
+func NewCompactor(sharedDir string, name string, bucketConfig client.TestBucketConfig, relabelConfig []relabel.Config, extArgs ...string) (*e2e.HTTPService, error) {
 	dir := filepath.Join(sharedDir, "data", "compact", name)
 	container := filepath.Join(e2e.ContainerSharedDir, "data", "compact", name)
 

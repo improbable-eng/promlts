@@ -16,6 +16,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/mozillazg/go-cos"
 	"github.com/pkg/errors"
+	"github.com/prometheus/common/config"
 	"github.com/thanos-io/thanos/pkg/objstore"
 	"github.com/thanos-io/thanos/pkg/objstore/clientutil"
 	"github.com/thanos-io/thanos/pkg/runutil"
@@ -34,11 +35,11 @@ type Bucket struct {
 
 // Config encapsulates the necessary config values to instantiate an cos client.
 type Config struct {
-	Bucket    string `yaml:"bucket"`
-	Region    string `yaml:"region"`
-	AppId     string `yaml:"app_id"`
-	SecretKey string `yaml:"secret_key"`
-	SecretId  string `yaml:"secret_id"`
+	Bucket    string        `yaml:"bucket"`
+	Region    string        `yaml:"region"`
+	AppId     string        `yaml:"app_id"`
+	SecretKey config.Secret `yaml:"secret_key"`
+	SecretId  string        `yaml:"secret_id"`
 }
 
 // Validate checks to see if mandatory cos config options are set.
@@ -77,7 +78,7 @@ func NewBucket(logger log.Logger, conf []byte, component string) (*Bucket, error
 	client := cos.NewClient(b, &http.Client{
 		Transport: &cos.AuthorizationTransport{
 			SecretID:  config.SecretId,
-			SecretKey: config.SecretKey,
+			SecretKey: string(config.SecretKey),
 		},
 	})
 
@@ -298,7 +299,7 @@ func configFromEnv() Config {
 		AppId:     os.Getenv("COS_APP_ID"),
 		Region:    os.Getenv("COS_REGION"),
 		SecretId:  os.Getenv("COS_SECRET_ID"),
-		SecretKey: os.Getenv("COS_SECRET_KEY"),
+		SecretKey: config.Secret(os.Getenv("COS_SECRET_KEY")),
 	}
 
 	return c

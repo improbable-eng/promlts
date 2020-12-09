@@ -40,6 +40,17 @@ type BucketConfig struct {
 	Config interface{} `yaml:"config"`
 }
 
+type TestBucketConfig struct {
+	Type   ObjProvider `yaml:"type"`
+	Config struct {
+		Bucket    string `yaml:"bucket"`
+		AccessKey string `yaml:"access_key"`
+		SecretKey string `yaml:"secret_key"`
+		Endpoint  string `yaml:"endpoint"`
+		Insecure  bool   `yaml:"insecure"`
+	}
+}
+
 // NewBucket initializes and returns new object storage clients.
 // NOTE: confContentYaml can contain secrets.
 func NewBucket(logger log.Logger, confContentYaml []byte, reg prometheus.Registerer, component string) (objstore.InstrumentedBucket, error) {

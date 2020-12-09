@@ -22,6 +22,7 @@ import (
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v2"
 
+	"github.com/prometheus/common/config"
 	"github.com/thanos-io/thanos/pkg/objstore"
 	"github.com/thanos-io/thanos/pkg/objstore/clientutil"
 )
@@ -31,10 +32,10 @@ const PartSize = 1024 * 1024 * 128
 
 // Config stores the configuration for oss bucket.
 type Config struct {
-	Endpoint        string `yaml:"endpoint"`
-	Bucket          string `yaml:"bucket"`
-	AccessKeyID     string `yaml:"access_key_id"`
-	AccessKeySecret string `yaml:"access_key_secret"`
+	Endpoint        string        `yaml:"endpoint"`
+	Bucket          string        `yaml:"bucket"`
+	AccessKeyID     string        `yaml:"access_key_id"`
+	AccessKeySecret config.Secret `yaml:"access_key_secret"`
 }
 
 // Bucket implements the store.Bucket interface.
@@ -51,7 +52,7 @@ func NewTestBucket(t testing.TB) (objstore.Bucket, func(), error) {
 		Endpoint:        os.Getenv("ALIYUNOSS_ENDPOINT"),
 		Bucket:          os.Getenv("ALIYUNOSS_BUCKET"),
 		AccessKeyID:     os.Getenv("ALIYUNOSS_ACCESS_KEY_ID"),
-		AccessKeySecret: os.Getenv("ALIYUNOSS_ACCESS_KEY_SECRET"),
+		AccessKeySecret: config.Secret(os.Getenv("ALIYUNOSS_ACCESS_KEY_SECRET")),
 	}
 
 	if c.Endpoint == "" || c.AccessKeyID == "" || c.AccessKeySecret == "" {
@@ -169,7 +170,7 @@ func NewBucket(logger log.Logger, conf []byte, component string) (*Bucket, error
 			"is not present in config file")
 	}
 
-	client, err := alioss.New(config.Endpoint, config.AccessKeyID, config.AccessKeySecret)
+	client, err := alioss.New(config.Endpoint, config.AccessKeyID, string(config.AccessKeySecret))
 	if err != nil {
 		return nil, errors.Wrap(err, "create aliyun oss client failed")
 	}
@@ -237,7 +238,7 @@ func NewTestBucketFromConfig(t testing.TB, c Config, reuseBucket bool) (objstore
 		if len(bktToCreate) >= 63 {
 			bktToCreate = bktToCreate[:63]
 		}
-		testclient, err := alioss.New(c.Endpoint, c.AccessKeyID, c.AccessKeySecret)
+		testclient, err := alioss.New(c.Endpoint, c.AccessKeyID, string(c.AccessKeySecret))
 		if err != nil {
 			return nil, nil, errors.Wrap(err, "create aliyun oss client failed")
 		}
