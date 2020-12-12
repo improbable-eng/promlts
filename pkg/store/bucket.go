@@ -115,6 +115,10 @@ type bucketStoreMetrics struct {
 
 	seriesFetchDuration   prometheus.Histogram
 	postingsFetchDuration prometheus.Histogram
+
+	blockSyncs              prometheus.Counter
+	blockSyncFailures       prometheus.Counter
+	blockSyncLastSuccessful prometheus.Gauge
 }
 
 func newBucketStoreMetrics(reg prometheus.Registerer) *bucketStoreMetrics {
@@ -235,6 +239,19 @@ func newBucketStoreMetrics(reg prometheus.Registerer) *bucketStoreMetrics {
 		Name:    "thanos_bucket_store_cached_postings_fetch_duration_seconds",
 		Help:    "The time it takes to fetch postings to respond to a request sent to a store gateway. It includes both the time to fetch it from the cache and from storage in case of cache misses.",
 		Buckets: []float64{0.001, 0.01, 0.1, 0.3, 0.6, 1, 3, 6, 9, 20, 30, 60, 90, 120},
+	})
+
+	m.blockSyncs = promauto.With(reg).NewCounter(prometheus.CounterOpts{
+		Name: "thanos_bucket_store_block_syncs_successful_total",
+		Help: "Total number of successful block syncs.",
+	})
+	m.blockSyncFailures = promauto.With(reg).NewCounter(prometheus.CounterOpts{
+		Name: "thanos_bucket_store_block_syncs_failures_total",
+		Help: "Total number of failed block syncs.",
+	})
+	m.blockSyncLastSuccessful = promauto.With(reg).NewGauge(prometheus.GaugeOpts{
+		Name: "thanos_bucket_store_block_last_successful_sync_time",
+		Help: "Time of the last successful sync.",
 	})
 
 	return &m
@@ -366,6 +383,7 @@ func (s *BucketStore) SyncBlocks(ctx context.Context) error {
 	metas, _, metaFetchErr := s.fetcher.Fetch(ctx)
 	// For partial view allow adding new blocks at least.
 	if metaFetchErr != nil && metas == nil {
+		s.metrics.blockSyncFailures.Inc()
 		return metaFetchErr
 	}
 
@@ -398,6 +416,7 @@ func (s *BucketStore) SyncBlocks(ctx context.Context) error {
 	wg.Wait()
 
 	if metaFetchErr != nil {
+		s.metrics.blockSyncFailures.Inc()
 		return metaFetchErr
 	}
 
@@ -426,6 +445,8 @@ func (s *BucketStore) SyncBlocks(ctx context.Context) error {
 		return strings.Compare(s.advLabelSets[i].String(), s.advLabelSets[j].String()) < 0
 	})
 	s.mtx.Unlock()
+	s.metrics.blockSyncs.Inc()
+	s.metrics.blockSyncLastSuccessful.SetToCurrentTime()
 	return nil
 }
 
