@@ -6,6 +6,7 @@ import Stores from './Stores';
 import StorePoolPanel from './StorePoolPanel';
 import { sampleAPIResponse } from './__testdata__/testdata';
 import { act } from 'react-dom/test-utils';
+import { PathPrefixContext } from '../../../contexts/PathPrefixContext';
 
 describe('Stores', () => {
   beforeEach(() => {
@@ -22,10 +23,14 @@ describe('Stores', () => {
 
     it('renders tables', async () => {
       await act(async () => {
-        stores = mount(<Stores />);
+        stores = mount(
+          <PathPrefixContext.Provider value="/path/prefix">
+            <Stores />
+          </PathPrefixContext.Provider>
+        );
       });
       stores.update();
-      expect(mock).toHaveBeenCalledWith('/api/v1/stores', { cache: 'no-store', credentials: 'same-origin' });
+      expect(mock).toHaveBeenCalledWith('/path/prefix/../api/v1/stores', { cache: 'no-store', credentials: 'same-origin' });
 
       const panels = stores.find(StorePoolPanel);
       expect(panels).toHaveLength(2);
@@ -49,11 +54,15 @@ describe('Stores', () => {
 
       let stores: any;
       await act(async () => {
-        stores = mount(<Stores />);
+        stores = mount(
+          <PathPrefixContext.Provider value="/path/prefix">
+            <Stores />
+          </PathPrefixContext.Provider>
+        );
       });
       stores.update();
 
-      expect(mock).toHaveBeenCalledWith('/api/v1/stores', { cache: 'no-store', credentials: 'same-origin' });
+      expect(mock).toHaveBeenCalledWith('/path/prefix/../api/v1/stores', { cache: 'no-store', credentials: 'same-origin' });
 
       const alert = stores.find(UncontrolledAlert);
       expect(alert.prop('color')).toBe('warning');
@@ -67,11 +76,15 @@ describe('Stores', () => {
 
       let stores: any;
       await act(async () => {
-        stores = mount(<Stores />);
+        stores = mount(
+          <PathPrefixContext.Provider value="/path/prefix">
+            <Stores />
+          </PathPrefixContext.Provider>
+        );
       });
       stores.update();
 
-      expect(mock).toHaveBeenCalledWith('/api/v1/stores', { cache: 'no-store', credentials: 'same-origin' });
+      expect(mock).toHaveBeenCalledWith('/path/prefix/../api/v1/stores', { cache: 'no-store', credentials: 'same-origin' });
 
       const alert = stores.find(UncontrolledAlert);
       expect(alert.prop('color')).toBe('danger');

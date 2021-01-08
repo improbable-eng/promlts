@@ -4,7 +4,7 @@ import { Router, Redirect, globalHistory } from '@reach/router';
 import { QueryParamProvider } from 'use-query-params';
 
 import { Alerts, Config, Flags, Rules, ServiceDiscovery, Status, Targets, TSDBStatus, PanelList, NotFound } from './pages';
-import PathPrefixProps from './types/PathPrefixProps';
+import { PathPrefixContext } from './contexts/PathPrefixContext';
 import ThanosComponentProps from './thanos/types/ThanosComponentProps';
 import Navigation from './thanos/Navbar';
 import { Stores, ErrorBoundary, Blocks } from './thanos/pages';
@@ -19,36 +19,64 @@ const defaultRouteConfig: { [component: string]: string } = {
   store: '/loaded',
 };
 
-const App: FC<PathPrefixProps & ThanosComponentProps> = ({ pathPrefix, thanosComponent }) => {
+const App: FC<ThanosComponentProps> = ({ thanosComponent }) => {
+  // This dynamically/generically determines the pathPrefix by stripping the first known
+  // endpoint suffix from the window location path. It works out of the box for both direct
+  // hosting and reverse proxy deployments with no additional configurations required.
+  let basePath = window.location.pathname;
+  const paths = [
+    '/graph',
+    '/alerts',
+    '/status',
+    '/tsdb-status',
+    '/flags',
+    '/config',
+    '/rules',
+    '/targets',
+    '/service-discovery',
+    '/stores',
+    '/blocks',
+    '/loaded',
+  ];
+  if (basePath.endsWith('/')) {
+    basePath = basePath.slice(0, -1);
+  }
+  if (basePath.length > 1) {
+    for (let i = 0; i < paths.length; i++) {
+      if (basePath.endsWith(paths[i])) {
+        basePath = basePath.slice(0, basePath.length - paths[i].length);
+        break;
+      }
+    }
+  }
+
   return (
     <ErrorBoundary>
-      <Navigation
-        pathPrefix={pathPrefix}
-        thanosComponent={thanosComponent}
-        defaultRoute={defaultRouteConfig[thanosComponent]}
-      />
-      <Container fluid style={{ paddingTop: 70 }}>
-        <QueryParamProvider reachHistory={globalHistory}>
-          <Router basepath={`${pathPrefix}/new`}>
-            <Redirect from="/" to={`${pathPrefix}/new${defaultRouteConfig[thanosComponent]}`} />
+      <PathPrefixContext.Provider value={basePath}>
+        <Navigation thanosComponent={thanosComponent} defaultRoute={defaultRouteConfig[thanosComponent]} />
+        <Container fluid style={{ paddingTop: 70 }}>
+          <QueryParamProvider reachHistory={globalHistory}>
+            <Router basepath={`${basePath}`}>
+              <Redirect from="/" to={`${basePath}${defaultRouteConfig[thanosComponent]}`} noThrow />
 
-            <PanelList path="/graph" pathPrefix={pathPrefix} />
-            <Alerts path="/alerts" pathPrefix={pathPrefix} />
-            <Config path="/config" pathPrefix={pathPrefix} />
-            <Flags path="/flags" pathPrefix={pathPrefix} />
-            <Rules path="/rules" pathPrefix={pathPrefix} />
-            <ServiceDiscovery path="/service-discovery" pathPrefix={pathPrefix} />
-            <Status path="/status" pathPrefix={pathPrefix} />
-            <TSDBStatus path="/tsdb-status" pathPrefix={pathPrefix} />
-            <Targets path="/targets" pathPrefix={pathPrefix} />
-            <Stores path="/stores" pathPrefix={pathPrefix} />
-            <Blocks path="/blocks" pathPrefix={pathPrefix} />
-            <Blocks path="/loaded" pathPrefix={pathPrefix} view="loaded" />
-            <NotFound pathPrefix={pathPrefix} default defaultRoute={defaultRouteConfig[thanosComponent]} />
-          </Router>
-          .
-        </QueryParamProvider>
-      </Container>
+              <PanelList path="/graph" />
+              <Alerts path="/alerts" />
+              <Config path="/config" />
+              <Flags path="/flags" />
+              <Rules path="/rules" />
+              <ServiceDiscovery path="/service-discovery" />
+              <Status path="/status" />
+              <TSDBStatus path="/tsdb-status" />
+              <Targets path="/targets" />
+              <Stores path="/stores" />
+              <Blocks path="/blocks" />
+              <Blocks path="/loaded" view="loaded" />
+              <NotFound default defaultRoute={defaultRouteConfig[thanosComponent]} />
+            </Router>
+            .
+          </QueryParamProvider>
+        </Container>
+      </PathPrefixContext.Provider>
     </ErrorBoundary>
   );
 };

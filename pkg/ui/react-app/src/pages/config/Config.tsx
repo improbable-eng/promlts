@@ -2,7 +2,8 @@ import React, { useState, FC } from 'react';
 import { RouteComponentProps } from '@reach/router';
 import { Button } from 'reactstrap';
 import CopyToClipboard from 'react-copy-to-clipboard';
-import PathPrefixProps from '../../types/PathPrefixProps';
+import { usePathPrefix } from '../../contexts/PathPrefixContext';
+import { API_PATH } from '../../constants/constants';
 
 import './Config.css';
 import { withStatusIndicator } from '../../components/withStatusIndicator';
@@ -44,8 +45,9 @@ export const ConfigContent: FC<ConfigContentProps> = ({ error, data }) => {
   );
 };
 
-const Config: FC<RouteComponentProps & PathPrefixProps> = ({ pathPrefix }) => {
-  const { response, error } = useFetch<YamlConfig>(`${pathPrefix}/api/v1/status/config`);
+const Config: FC<RouteComponentProps> = () => {
+  const pathPrefix = usePathPrefix();
+  const { response, error } = useFetch<YamlConfig>(`${pathPrefix}/${API_PATH}/status/config`);
   return <ConfigContent error={error} data={response.data} />;
 };
 

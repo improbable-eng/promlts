@@ -6,6 +6,7 @@ import Blocks from './Blocks';
 import { SourceView } from './SourceView';
 import { sampleAPIResponse } from './__testdata__/testdata';
 import { act } from 'react-dom/test-utils';
+import { PathPrefixContext } from '../../../contexts/PathPrefixContext';
 
 describe('Blocks', () => {
   beforeEach(() => {
@@ -22,10 +23,17 @@ describe('Blocks', () => {
 
     it('renders sources', async () => {
       await act(async () => {
-        blocks = mount(<Blocks />);
+        blocks = mount(
+          <PathPrefixContext.Provider value="/path/prefix">
+            <Blocks />
+          </PathPrefixContext.Provider>
+        );
       });
       blocks.update();
-      expect(mock).toHaveBeenCalledWith('/api/v1/blocks?view=global', { cache: 'no-store', credentials: 'same-origin' });
+      expect(mock).toHaveBeenCalledWith('/path/prefix/../api/v1/blocks?view=global', {
+        cache: 'no-store',
+        credentials: 'same-origin',
+      });
 
       const sourceViews = blocks.find(SourceView);
       expect(sourceViews).toHaveLength(8);
@@ -33,10 +41,17 @@ describe('Blocks', () => {
 
     it('fetched data with different view', async () => {
       await act(async () => {
-        blocks = mount(<Blocks view="loaded" />);
+        blocks = mount(
+          <PathPrefixContext.Provider value="/path/prefix">
+            <Blocks view="loaded" />
+          </PathPrefixContext.Provider>
+        );
       });
       blocks.update();
-      expect(mock).toHaveBeenCalledWith('/api/v1/blocks?view=loaded', { cache: 'no-store', credentials: 'same-origin' });
+      expect(mock).toHaveBeenCalledWith('/path/prefix/../api/v1/blocks?view=loaded', {
+        cache: 'no-store',
+        credentials: 'same-origin',
+      });
 
       const sourceViews = blocks.find(SourceView);
       expect(sourceViews).toHaveLength(8);
@@ -56,11 +71,18 @@ describe('Blocks', () => {
 
       let blocks: any;
       await act(async () => {
-        blocks = mount(<Blocks />);
+        blocks = mount(
+          <PathPrefixContext.Provider value="/path/prefix">
+            <Blocks />
+          </PathPrefixContext.Provider>
+        );
       });
       blocks.update();
 
-      expect(mock).toHaveBeenCalledWith('/api/v1/blocks?view=global', { cache: 'no-store', credentials: 'same-origin' });
+      expect(mock).toHaveBeenCalledWith('/path/prefix/../api/v1/blocks?view=global', {
+        cache: 'no-store',
+        credentials: 'same-origin',
+      });
 
       const alert = blocks.find(UncontrolledAlert);
       expect(alert.prop('color')).toBe('warning');
@@ -74,11 +96,18 @@ describe('Blocks', () => {
 
       let blocks: any;
       await act(async () => {
-        blocks = mount(<Blocks />);
+        blocks = mount(
+          <PathPrefixContext.Provider value="/path/prefix">
+            <Blocks />
+          </PathPrefixContext.Provider>
+        );
       });
       blocks.update();
 
-      expect(mock).toHaveBeenCalledWith('/api/v1/blocks?view=global', { cache: 'no-store', credentials: 'same-origin' });
+      expect(mock).toHaveBeenCalledWith('/path/prefix/../api/v1/blocks?view=global', {
+        cache: 'no-store',
+        credentials: 'same-origin',
+      });
 
       const alert = blocks.find(UncontrolledAlert);
       expect(alert.prop('color')).toBe('danger');

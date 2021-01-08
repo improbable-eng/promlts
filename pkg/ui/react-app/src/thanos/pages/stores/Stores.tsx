@@ -3,9 +3,10 @@ import { RouteComponentProps } from '@reach/router';
 import { UncontrolledAlert } from 'reactstrap';
 import { withStatusIndicator } from '../../../components/withStatusIndicator';
 import { useFetch } from '../../../hooks/useFetch';
-import PathPrefixProps from '../../../types/PathPrefixProps';
 import { Store } from './store';
 import { StorePoolPanel } from './StorePoolPanel';
+import { usePathPrefix } from '../../../contexts/PathPrefixContext';
+import { API_PATH } from '../../../constants/constants';
 
 export interface StoreListProps {
   [storeType: string]: Store[];
@@ -28,8 +29,9 @@ export const StoreContent: FC<{ data: StoreListProps }> = ({ data }) => {
 
 const StoresWithStatusIndicator = withStatusIndicator(StoreContent);
 
-export const Stores: FC<RouteComponentProps & PathPrefixProps> = ({ pathPrefix = '' }) => {
-  const { response, error, isLoading } = useFetch<StoreListProps>(`${pathPrefix}/api/v1/stores`);
+export const Stores: FC<RouteComponentProps> = () => {
+  const pathPrefix = usePathPrefix();
+  const { response, error, isLoading } = useFetch<StoreListProps>(`${pathPrefix}/${API_PATH}/stores`);
   const { status: responseStatus } = response;
   const badResponse = responseStatus !== 'success' && responseStatus !== 'start fetching';
 
