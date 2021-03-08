@@ -28,7 +28,6 @@ import (
 	"github.com/prometheus/prometheus/pkg/labels"
 	"github.com/prometheus/prometheus/storage/remote"
 	"github.com/prometheus/prometheus/tsdb/chunkenc"
-	"github.com/thanos-io/thanos/pkg/store/labelpb"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -36,8 +35,10 @@ import (
 	thanoshttp "github.com/thanos-io/thanos/pkg/http"
 	"github.com/thanos-io/thanos/pkg/promclient"
 	"github.com/thanos-io/thanos/pkg/runutil"
+	"github.com/thanos-io/thanos/pkg/store/labelpb"
 	"github.com/thanos-io/thanos/pkg/store/storepb"
 	"github.com/thanos-io/thanos/pkg/store/storepb/prompb"
+	"github.com/thanos-io/thanos/pkg/strutil"
 	"github.com/thanos-io/thanos/pkg/tracing"
 )
 
@@ -480,26 +481,42 @@ func (p *PrometheusStore) encodeChunk(ss []prompb.Sample) (storepb.Chunk_Encodin
 
 // LabelNames returns all known label names.
 func (p *PrometheusStore) LabelNames(ctx context.Context, r *storepb.LabelNamesRequest) (*storepb.LabelNamesResponse, error) {
+	mint, maxt := p.timestamps()
+	if r.Start > maxt || r.End <= mint {
+		return &storepb.LabelNamesResponse{Names: []string{}}, nil
+	}
+
 	lbls, err := p.client.LabelNamesInGRPC(ctx, p.base, nil, r.Start, r.End)
 	if err != nil {
 		return nil, err
 	}
+
+	externalLset := p.externalLabelsFn()
+	extLabelNames := make([]string, 0, len(externalLset))
+	for _, lbl := range externalLset {
+		extLabelNames = append(extLabelNames, lbl.Name)
+	}
+	lbls = strutil.MergeSlices(lbls, extLabelNames)
 	return &storepb.LabelNamesResponse{Names: lbls}, nil
 }
 
 // LabelValues returns all known label values for a given label name.
 func (p *PrometheusStore) LabelValues(ctx context.Context, r *storepb.LabelValuesRequest) (*storepb.LabelValuesResponse, error) {
-	externalLset := p.externalLabelsFn()
-
-	// First check for matching external label which has priority.
-	if l := externalLset.Get(r.Label); l != "" {
-		return &storepb.LabelValuesResponse{Values: []string{l}}, nil
+	mint, maxt := p.timestamps()
+	if r.Start > maxt || r.End <= mint {
+		return &storepb.LabelValuesResponse{Values: []string{}}, nil
 	}
 
 	vals, err := p.client.LabelValuesInGRPC(ctx, p.base, r.Label, nil, r.Start, r.End)
 	if err != nil {
 		return nil, err
 	}
-	sort.Strings(vals)
+
+	externalLset := p.externalLabelsFn()
+	// Add the external label value as well.
+	if extLabelValue := externalLset.Get(r.Label); extLabelValue != "" {
+		vals = strutil.MergeSlices(vals, []string{extLabelValue})
+	}
+
 	return &storepb.LabelValuesResponse{Values: vals}, nil
 }

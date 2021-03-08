@@ -298,12 +298,12 @@ func TestQueryLabelNames(t *testing.T) {
 
 	// Outside time range.
 	labelNames(t, ctx, q.HTTPEndpoint(), nil, timestamp.FromTime(now.Add(-24*time.Hour)), timestamp.FromTime(now.Add(-23*time.Hour)), func(res []string) bool {
-		return len(res) == 0
+		return len(res) == 2
 	})
 
 	labelNames(t, ctx, q.HTTPEndpoint(), []storepb.LabelMatcher{{Type: storepb.LabelMatcher_EQ, Name: "__name__", Value: "up"}},
 		timestamp.FromTime(now.Add(-time.Hour)), timestamp.FromTime(now.Add(time.Hour)), func(res []string) bool {
-			// Expected result: [__name__, instance, job, prometheus, replica]
+			// Expected result: [__name__, instance, job, prometheus, receive, replica, tenant_id]
 			return len(res) == 7
 		},
 	)

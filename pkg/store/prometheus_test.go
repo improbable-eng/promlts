@@ -375,7 +375,8 @@ func TestPrometheusStore_LabelNames_e2e(t *testing.T) {
 	u, err := url.Parse(fmt.Sprintf("http://%s", p.Addr()))
 	testutil.Ok(t, err)
 
-	proxy, err := NewPrometheusStore(nil, nil, promclient.NewDefaultClient(), u, component.Sidecar, getExternalLabels, nil)
+	proxy, err := NewPrometheusStore(nil, nil, promclient.NewDefaultClient(), u, component.Sidecar,
+		getExternalLabels, func() (int64, int64) { return 0, 1000 })
 	testutil.Ok(t, err)
 
 	resp, err := proxy.LabelNames(ctx, &storepb.LabelNamesRequest{
@@ -384,9 +385,10 @@ func TestPrometheusStore_LabelNames_e2e(t *testing.T) {
 	})
 	testutil.Ok(t, err)
 	testutil.Equals(t, []string(nil), resp.Warnings)
-	testutil.Equals(t, []string{"a"}, resp.Names)
+	testutil.Equals(t, []string{"a", "ext_a", "ext_b"}, resp.Names)
 
 	// Outside time range.
+	// External labels will not be injected if the time range doesn't match.
 	resp, err = proxy.LabelNames(ctx, &storepb.LabelNamesRequest{
 		Start: timestamp.FromTime(maxTime.Add(-time.Second)),
 		End:   timestamp.FromTime(maxTime),
@@ -420,7 +422,8 @@ func TestPrometheusStore_LabelValues_e2e(t *testing.T) {
 	u, err := url.Parse(fmt.Sprintf("http://%s", p.Addr()))
 	testutil.Ok(t, err)
 
-	proxy, err := NewPrometheusStore(nil, nil, promclient.NewDefaultClient(), u, component.Sidecar, getExternalLabels, nil)
+	proxy, err := NewPrometheusStore(nil, nil, promclient.NewDefaultClient(), u, component.Sidecar,
+		getExternalLabels, func() (int64, int64) { return 0, 1000 })
 	testutil.Ok(t, err)
 
 	resp, err := proxy.LabelValues(ctx, &storepb.LabelValuesRequest{
@@ -466,21 +469,24 @@ func TestPrometheusStore_ExternalLabelValues_e2e(t *testing.T) {
 	u, err := url.Parse(fmt.Sprintf("http://%s", p.Addr()))
 	testutil.Ok(t, err)
 
-	proxy, err := NewPrometheusStore(nil, nil, promclient.NewDefaultClient(), u, component.Sidecar, getExternalLabels, nil)
+	proxy, err := NewPrometheusStore(nil, nil, promclient.NewDefaultClient(), u, component.Sidecar,
+		getExternalLabels, func() (int64, int64) { return 0, 1000 })
 	testutil.Ok(t, err)
 
 	resp, err := proxy.LabelValues(ctx, &storepb.LabelValuesRequest{
 		Label: "ext_a",
+		Start: timestamp.FromTime(minTime),
+		End:   timestamp.FromTime(maxTime),
 	})
 	testutil.Ok(t, err)
-
-	testutil.Equals(t, []string{"a"}, resp.Values)
+	testutil.Equals(t, []string{"a", "b"}, resp.Values)
 
 	resp, err = proxy.LabelValues(ctx, &storepb.LabelValuesRequest{
 		Label: "a",
+		Start: timestamp.FromTime(minTime),
+		End:   timestamp.FromTime(maxTime),
 	})
 	testutil.Ok(t, err)
-
 	testutil.Equals(t, []string{"b"}, resp.Values)
 }
 

@@ -20,6 +20,7 @@ import (
 	"github.com/thanos-io/thanos/pkg/component"
 	"github.com/thanos-io/thanos/pkg/runutil"
 	"github.com/thanos-io/thanos/pkg/store/storepb"
+	"github.com/thanos-io/thanos/pkg/strutil"
 )
 
 const RemoteReadFrameLimit = 1048576
@@ -198,6 +199,11 @@ func (s *TSDBStore) Series(r *storepb.SeriesRequest, srv storepb.Store_SeriesSer
 func (s *TSDBStore) LabelNames(ctx context.Context, r *storepb.LabelNamesRequest) (
 	*storepb.LabelNamesResponse, error,
 ) {
+	withinTimeRange, err := s.checkRequestTimeRange(r.End)
+	if !withinTimeRange || err != nil {
+		return &storepb.LabelNamesResponse{Names: []string{}}, err
+	}
+
 	q, err := s.db.ChunkQuerier(ctx, r.Start, r.End)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
@@ -208,6 +214,12 @@ func (s *TSDBStore) LabelNames(ctx context.Context, r *storepb.LabelNamesRequest
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
+
+	extLabelNames := make([]string, 0, len(s.extLset))
+	for _, lbl := range s.extLset {
+		extLabelNames = append(extLabelNames, lbl.Name)
+	}
+	res = strutil.MergeSlices(res, extLabelNames)
 	return &storepb.LabelNamesResponse{Names: res}, nil
 }
 
@@ -215,6 +227,11 @@ func (s *TSDBStore) LabelNames(ctx context.Context, r *storepb.LabelNamesRequest
 func (s *TSDBStore) LabelValues(ctx context.Context, r *storepb.LabelValuesRequest) (
 	*storepb.LabelValuesResponse, error,
 ) {
+	withinTimeRange, err := s.checkRequestTimeRange(r.End)
+	if !withinTimeRange || err != nil {
+		return &storepb.LabelValuesResponse{Values: []string{}}, err
+	}
+
 	q, err := s.db.ChunkQuerier(ctx, r.Start, r.End)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
@@ -225,5 +242,22 @@ func (s *TSDBStore) LabelValues(ctx context.Context, r *storepb.LabelValuesReque
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
+
+	// Add the external label value as well.
+	if extLabelValue := s.extLset.Get(r.Label); extLabelValue != "" {
+		res = strutil.MergeSlices(res, []string{extLabelValue})
+	}
+
 	return &storepb.LabelValuesResponse{Values: res}, nil
+}
+
+func (s *TSDBStore) checkRequestTimeRange(end int64) (bool, error) {
+	minTime, err := s.db.StartTime()
+	if err != nil {
+		return false, errors.Wrap(err, "TSDB min Time")
+	}
+	if end <= minTime {
+		return false, nil
+	}
+	return true, nil
 }
