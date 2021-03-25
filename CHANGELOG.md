@@ -43,6 +43,7 @@ We use _breaking :warning:_ to mark changes that are not backward compatible (re
 
 ### Fixed
 
+- [#3800](https://github.com/thanos-io/thanos/pull/3800) Cleaning comments.
 - [#3773](https://github.com/thanos-io/thanos/pull/3773) Compact: Pad compaction planner size check
 - [#3795](https://github.com/thanos-io/thanos/pull/3795) s3: A truncated "get object" response is reported as error.
 - [#3814](https://github.com/thanos-io/thanos/pull/3814) Store: Decreased memory utilisation while fetching block's chunks.
