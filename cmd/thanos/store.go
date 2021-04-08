@@ -384,7 +384,7 @@ func runStore(
 	}
 
 	infoSrv := info.NewInfoServer(
-		infopb.ComponentType_STORE,
+		component.Store.String(),
 		func() []labelpb.ZLabelSet {
 			return bs.LabelSet()
 		},
@@ -396,6 +396,9 @@ func runStore(
 			}
 		},
 		func() *infopb.ExemplarsInfo { return nil },
+		nil,
+		nil,
+		nil,
 	)
 
 	// Start query (proxy) gRPC StoreAPI.

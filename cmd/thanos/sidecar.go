@@ -253,7 +253,7 @@ func runSidecar(
 		examplarSrv := exemplars.NewPrometheus(conf.prometheus.url, c, m.Labels)
 
 		infoSrv := info.NewInfoServer(
-			infopb.ComponentType_SIDECAR,
+			component.Sidecar.String(),
 			func() []labelpb.ZLabelSet {
 				return promStore.LabelSet()
 			},
@@ -271,6 +271,15 @@ func runSidecar(
 					MinTime: time.Unix(math.MinInt64/1000+62135596801, 0).UTC().Unix(),
 					MaxTime: time.Unix(math.MaxInt64/1000-62135596801, 999999999).UTC().Unix(),
 				}
+			},
+			func() *infopb.RulesInfo {
+				return &infopb.RulesInfo{}
+			},
+			func() *infopb.TargetsInfo {
+				return &infopb.TargetsInfo{}
+			},
+			func() *infopb.MetricMetadataInfo {
+				return &infopb.MetricMetadataInfo{}
 			},
 		)
 
