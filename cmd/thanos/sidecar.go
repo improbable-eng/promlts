@@ -30,6 +30,8 @@ import (
 	"github.com/thanos-io/thanos/pkg/extkingpin"
 	"github.com/thanos-io/thanos/pkg/extprom"
 	thanoshttp "github.com/thanos-io/thanos/pkg/http"
+	"github.com/thanos-io/thanos/pkg/info"
+	"github.com/thanos-io/thanos/pkg/info/infopb"
 	"github.com/thanos-io/thanos/pkg/logging"
 	meta "github.com/thanos-io/thanos/pkg/metadata"
 	thanosmodel "github.com/thanos-io/thanos/pkg/model"
@@ -43,6 +45,7 @@ import (
 	httpserver "github.com/thanos-io/thanos/pkg/server/http"
 	"github.com/thanos-io/thanos/pkg/shipper"
 	"github.com/thanos-io/thanos/pkg/store"
+	"github.com/thanos-io/thanos/pkg/store/labelpb"
 	"github.com/thanos-io/thanos/pkg/targets"
 	"github.com/thanos-io/thanos/pkg/tls"
 	"github.com/thanos-io/thanos/pkg/tracing"
@@ -247,12 +250,37 @@ func runSidecar(
 			return errors.Wrap(err, "setup gRPC server")
 		}
 
+		examplarSrv := exemplars.NewPrometheus(conf.prometheus.url, c, m.Labels)
+
+		infoSrv := info.NewInfoServer(
+			infopb.ComponentType_SIDECAR,
+			func() []labelpb.ZLabelSet {
+				return promStore.LabelSet()
+			},
+			func() *infopb.StoreInfo {
+				mint, maxt := promStore.Timestamps()
+				return &infopb.StoreInfo{
+					MinTime: mint,
+					MaxTime: maxt,
+				}
+			},
+			func() *infopb.ExemplarsInfo {
+				// Currently Exemplars API does not expose metadata such as min/max time,
+				// so we are using default minimum and maximum possible values as min/max time.
+				return &infopb.ExemplarsInfo{
+					MinTime: time.Unix(math.MinInt64/1000+62135596801, 0).UTC().Unix(),
+					MaxTime: time.Unix(math.MaxInt64/1000-62135596801, 999999999).UTC().Unix(),
+				}
+			},
+		)
+
 		s := grpcserver.New(logger, reg, tracer, grpcLogOpts, tagOpts, comp, grpcProbe,
 			grpcserver.WithServer(store.RegisterStoreServer(promStore)),
 			grpcserver.WithServer(rules.RegisterRulesServer(rules.NewPrometheus(conf.prometheus.url, c, m.Labels))),
 			grpcserver.WithServer(targets.RegisterTargetsServer(targets.NewPrometheus(conf.prometheus.url, c, m.Labels))),
 			grpcserver.WithServer(meta.RegisterMetadataServer(meta.NewPrometheus(conf.prometheus.url, c))),
-			grpcserver.WithServer(exemplars.RegisterExemplarsServer(exemplars.NewPrometheus(conf.prometheus.url, c, m.Labels))),
+			grpcserver.WithServer(exemplars.RegisterExemplarsServer(examplarSrv)),
+			grpcserver.WithServer(info.RegisterInfoServer(infoSrv)),
 			grpcserver.WithListen(conf.grpc.bindAddress),
 			grpcserver.WithGracePeriod(time.Duration(conf.grpc.gracePeriod)),
 			grpcserver.WithTLSConfig(tlsCfg),

@@ -663,6 +663,16 @@ func (s *BucketStore) TimeRange() (mint, maxt int64) {
 	return mint, maxt
 }
 
+func (s *BucketStore) LabelSet() []labelpb.ZLabelSet {
+	labelSets := s.advLabelSets
+
+	if s.enableCompatibilityLabel && len(labelSets) > 0 {
+		labelSets = append(labelSets, labelpb.ZLabelSet{Labels: []labelpb.ZLabel{{Name: CompatibilityTypeLabelName, Value: "store"}}})
+	}
+
+	return labelSets
+}
+
 // Info implements the storepb.StoreServer interface.
 func (s *BucketStore) Info(context.Context, *storepb.InfoRequest) (*storepb.InfoResponse, error) {
 	mint, maxt := s.TimeRange()
@@ -673,14 +683,8 @@ func (s *BucketStore) Info(context.Context, *storepb.InfoRequest) (*storepb.Info
 	}
 
 	s.mtx.RLock()
-	res.LabelSets = s.advLabelSets
+	res.LabelSets = s.LabelSet()
 	s.mtx.RUnlock()
-
-	if s.enableCompatibilityLabel && len(res.LabelSets) > 0 {
-		// This is for compatibility with Querier v0.7.0.
-		// See query.StoreCompatibilityTypeLabelName comment for details.
-		res.LabelSets = append(res.LabelSets, labelpb.ZLabelSet{Labels: []labelpb.ZLabel{{Name: CompatibilityTypeLabelName, Value: "store"}}})
-	}
 	return res, nil
 }
 
