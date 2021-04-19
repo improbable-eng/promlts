@@ -88,13 +88,14 @@ func TestStoreGateway(t *testing.T) {
 	id4, err := e2eutil.CreateBlock(ctx, dir, series, 10, timestamp.FromTime(now), timestamp.FromTime(now.Add(2*time.Hour)), extLset, 0, metadata.NoneFunc)
 	testutil.Ok(t, err)
 	l := log.NewLogfmtLogger(os.Stdout)
+	var path_ []string
 	bkt, err := s3.NewBucketWithConfig(l, s3.Config{
 		Bucket:    "thanos",
 		AccessKey: e2edb.MinioAccessKey,
 		SecretKey: e2edb.MinioSecretKey,
 		Endpoint:  m.HTTPEndpoint(), // We need separate client config, when connecting to minio from outside.
 		Insecure:  true,
-	}, "test-feed")
+	}, "test-feed", path_...)
 	testutil.Ok(t, err)
 
 	testutil.Ok(t, objstore.UploadDir(ctx, l, bkt, path.Join(dir, id1.String()), id1.String()))

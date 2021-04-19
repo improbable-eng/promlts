@@ -42,7 +42,7 @@ type BucketConfig struct {
 
 // NewBucket initializes and returns new object storage clients.
 // NOTE: confContentYaml can contain secrets.
-func NewBucket(logger log.Logger, confContentYaml []byte, reg prometheus.Registerer, component string) (objstore.InstrumentedBucket, error) {
+func NewBucket(logger log.Logger, confContentYaml []byte, reg prometheus.Registerer, component string, path ...string) (objstore.InstrumentedBucket, error) {
 	level.Info(logger).Log("msg", "loading bucket configuration")
 	bucketConf := &BucketConfig{}
 	if err := yaml.UnmarshalStrict(confContentYaml, bucketConf); err != nil {
@@ -59,7 +59,7 @@ func NewBucket(logger log.Logger, confContentYaml []byte, reg prometheus.Registe
 	case string(GCS):
 		bucket, err = gcs.NewBucket(context.Background(), logger, config, component)
 	case string(S3):
-		bucket, err = s3.NewBucket(logger, config, component)
+		bucket, err = s3.NewBucket(logger, config, component, path...)
 	case string(AZURE):
 		bucket, err = azure.NewBucket(logger, config, component)
 	case string(SWIFT):

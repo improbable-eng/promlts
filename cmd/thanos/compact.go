@@ -194,8 +194,9 @@ func runCompact(
 	if err != nil {
 		return err
 	}
+	confPathYaml, err := conf.objStore.GetPath()
 
-	bkt, err := client.NewBucket(logger, confContentYaml, reg, component.String())
+	bkt, err := client.NewBucket(logger, confContentYaml, reg, component.String(), confPathYaml...)
 	if err != nil {
 		return err
 	}

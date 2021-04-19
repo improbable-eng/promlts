@@ -577,11 +577,11 @@ func runRule(
 	if err != nil {
 		return err
 	}
-
+	confPathYaml, err := objStoreConfig.GetPath()
 	if len(confContentYaml) > 0 {
 		// The background shipper continuously scans the data directory and uploads
 		// new blocks to Google Cloud Storage or an S3-compatible storage service.
-		bkt, err := client.NewBucket(logger, confContentYaml, reg, component.Rule.String())
+		bkt, err := client.NewBucket(logger, confContentYaml, reg, component.Rule.String(), confPathYaml...)
 		if err != nil {
 			return err
 		}

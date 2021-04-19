@@ -107,14 +107,15 @@ func registerBucketVerify(app extkingpin.AppClause, objStoreConfig *extflag.Path
 		if err != nil {
 			return err
 		}
-
-		bkt, err := client.NewBucket(logger, confContentYaml, reg, component.Bucket.String())
+		confPathYaml, err := objStoreConfig.GetPath()
+		bkt, err := client.NewBucket(logger, confContentYaml, reg, component.Bucket.String(), confPathYaml...)
 		if err != nil {
 			return err
 		}
 		defer runutil.CloseWithLogOnErr(logger, bkt, "bucket client")
 
 		backupconfContentYaml, err := objStoreBackupConfig.Content()
+		backupconfPathYaml, err := objStoreBackupConfig.GetPath()
 		if err != nil {
 			return err
 		}
@@ -126,7 +127,7 @@ func registerBucketVerify(app extkingpin.AppClause, objStoreConfig *extflag.Path
 			}
 		} else {
 			// nil Prometheus registerer: don't create conflicting metrics.
-			backupBkt, err = client.NewBucket(logger, backupconfContentYaml, nil, component.Bucket.String())
+			backupBkt, err = client.NewBucket(logger, backupconfContentYaml, nil, component.Bucket.String(), backupconfPathYaml...)
 			if err != nil {
 				return err
 			}
@@ -184,8 +185,8 @@ func registerBucketLs(app extkingpin.AppClause, objStoreConfig *extflag.PathOrCo
 		if err != nil {
 			return err
 		}
-
-		bkt, err := client.NewBucket(logger, confContentYaml, reg, component.Bucket.String())
+		confPathYaml, err := objStoreConfig.GetPath()
+		bkt, err := client.NewBucket(logger, confContentYaml, reg, component.Bucket.String(), confPathYaml...)
 		if err != nil {
 			return err
 		}
@@ -284,8 +285,8 @@ func registerBucketInspect(app extkingpin.AppClause, objStoreConfig *extflag.Pat
 		if err != nil {
 			return err
 		}
-
-		bkt, err := client.NewBucket(logger, confContentYaml, reg, component.Bucket.String())
+		confPathYaml, err := objStoreConfig.GetPath()
+		bkt, err := client.NewBucket(logger, confContentYaml, reg, component.Bucket.String(), confPathYaml...)
 		if err != nil {
 			return err
 		}
@@ -404,8 +405,9 @@ func registerBucketWeb(app extkingpin.AppClause, objStoreConfig *extflag.PathOrC
 		if err != nil {
 			return err
 		}
+		confPathYaml, err := objStoreConfig.GetPath()
 
-		bkt, err := client.NewBucket(logger, confContentYaml, reg, component.Bucket.String())
+		bkt, err := client.NewBucket(logger, confContentYaml, reg, component.Bucket.String(), confPathYaml...)
 		if err != nil {
 			return errors.Wrap(err, "bucket client")
 		}
@@ -543,7 +545,7 @@ func registerBucketCleanup(app extkingpin.AppClause, objStoreConfig *extflag.Pat
 		if err != nil {
 			return err
 		}
-
+		confPathYaml, err := objStoreConfig.GetPath()
 		relabelContentYaml, err := selectorRelabelConf.Content()
 		if err != nil {
 			return errors.Wrap(err, "get content of relabel configuration")
@@ -554,7 +556,7 @@ func registerBucketCleanup(app extkingpin.AppClause, objStoreConfig *extflag.Pat
 			return err
 		}
 
-		bkt, err := client.NewBucket(logger, confContentYaml, reg, component.Cleanup.String())
+		bkt, err := client.NewBucket(logger, confContentYaml, reg, component.Cleanup.String(), confPathYaml...)
 		if err != nil {
 			return err
 		}
@@ -764,8 +766,9 @@ func registerBucketMarkBlock(app extkingpin.AppClause, objStoreConfig *extflag.P
 		if err != nil {
 			return err
 		}
+		confPathYaml, err := objStoreConfig.GetPath()
 
-		bkt, err := client.NewBucket(logger, confContentYaml, reg, component.Mark.String())
+		bkt, err := client.NewBucket(logger, confContentYaml, reg, component.Mark.String(), confPathYaml...)
 		if err != nil {
 			return err
 		}
@@ -827,8 +830,9 @@ func registerBucketRewrite(app extkingpin.AppClause, objStoreConfig *extflag.Pat
 		if err != nil {
 			return err
 		}
+		confPathYaml, err := objStoreConfig.GetPath()
 
-		bkt, err := client.NewBucket(logger, confContentYaml, reg, component.Rewrite.String())
+		bkt, err := client.NewBucket(logger, confContentYaml, reg, component.Rewrite.String(), confPathYaml...)
 		if err != nil {
 			return err
 		}

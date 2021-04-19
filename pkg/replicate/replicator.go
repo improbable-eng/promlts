@@ -117,7 +117,7 @@ func RunReplicate(
 	if err != nil {
 		return err
 	}
-
+	fromConfPathYaml, err := fromObjStoreConfig.GetPath()
 	if len(fromConfContentYaml) == 0 {
 		return errors.New("No supported bucket was configured to replicate from")
 	}
@@ -127,6 +127,7 @@ func RunReplicate(
 		fromConfContentYaml,
 		prometheus.WrapRegistererWith(prometheus.Labels{"replicate": "from"}, reg),
 		component.Replicate.String(),
+		fromConfPathYaml...,
 	)
 	if err != nil {
 		return err
@@ -136,7 +137,7 @@ func RunReplicate(
 	if err != nil {
 		return err
 	}
-
+	toConfPathYaml, err := toObjStoreConfig.GetPath()
 	if len(toConfContentYaml) == 0 {
 		return errors.New("No supported bucket was configured to replicate to")
 	}
@@ -146,6 +147,7 @@ func RunReplicate(
 		toConfContentYaml,
 		prometheus.WrapRegistererWith(prometheus.Labels{"replicate": "to"}, reg),
 		component.Replicate.String(),
+		toConfPathYaml...,
 	)
 	if err != nil {
 		return err

@@ -248,8 +248,8 @@ func runStore(
 	if err != nil {
 		return err
 	}
-
-	bkt, err := client.NewBucket(logger, confContentYaml, reg, component.String())
+	confPathYaml, err := objStoreConfig.GetPath()
+	bkt, err := client.NewBucket(logger, confContentYaml, reg, component.String(), confPathYaml...)
 	if err != nil {
 		return errors.Wrap(err, "create bucket client")
 	}

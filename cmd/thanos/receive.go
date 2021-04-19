@@ -253,6 +253,7 @@ func runReceive(
 	if err != nil {
 		return err
 	}
+	confPathYaml, err := objStoreConfig.GetPath()
 	upload := len(confContentYaml) > 0
 	if upload {
 		if tsdbOpts.MinBlockDuration != tsdbOpts.MaxBlockDuration {
@@ -264,7 +265,7 @@ func runReceive(
 		}
 		// The background shipper continuously scans the data directory and uploads
 		// new blocks to object storage service.
-		bkt, err = client.NewBucket(logger, confContentYaml, reg, comp.String())
+		bkt, err = client.NewBucket(logger, confContentYaml, reg, comp.String(), confPathYaml...)
 		if err != nil {
 			return err
 		}

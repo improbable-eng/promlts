@@ -335,14 +335,14 @@ func TestCompactWithStoreGateway(t *testing.T) {
 	const bucket = "compact_test"
 	m := e2edb.NewMinio(8080, bucket)
 	testutil.Ok(t, s.StartAndWaitReady(m))
-
+	var path_ []string
 	bkt, err := s3.NewBucketWithConfig(logger, s3.Config{
 		Bucket:    bucket,
 		AccessKey: e2edb.MinioAccessKey,
 		SecretKey: e2edb.MinioSecretKey,
 		Endpoint:  m.HTTPEndpoint(), // We need separate client config, when connecting to minio from outside.
 		Insecure:  true,
-	}, "test-feed")
+	}, "test-feed", path_...)
 	testutil.Ok(t, err)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)

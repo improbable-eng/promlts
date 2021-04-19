@@ -30,14 +30,14 @@ func BenchmarkUpload(b *testing.B) {
 	const bucket = "test"
 	m := e2edb.NewMinio(8080, bucket)
 	testutil.Ok(b, s.StartAndWaitReady(m))
-
+	var path []string
 	bkt, err := s3.NewBucketWithConfig(log.NewNopLogger(), s3.Config{
 		Bucket:    bucket,
 		AccessKey: e2edb.MinioAccessKey,
 		SecretKey: e2edb.MinioSecretKey,
 		Endpoint:  m.HTTPEndpoint(),
 		Insecure:  true,
-	}, "test-feed")
+	}, "test-feed", path...)
 	testutil.Ok(b, err)
 
 	buf := bytes.Buffer{}
