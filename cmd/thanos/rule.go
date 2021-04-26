@@ -15,6 +15,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/prometheus/prometheus/storage"
+	"github.com/thanos-io/thanos/pkg/rules/remotewrite"
+
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	grpc_logging "github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
@@ -75,6 +78,9 @@ type ruleConfig struct {
 	alertQueryURL          *url.URL
 	alertRelabelConfigYAML []byte
 
+	rwConfig     ruleRWConfig
+	rwConfigYAML []byte
+
 	resendDelay    time.Duration
 	evalInterval   time.Duration
 	ruleFiles      []string
@@ -91,6 +97,7 @@ func (rc *ruleConfig) registerFlag(cmd extkingpin.FlagClause) {
 	rc.shipper.registerFlag(cmd)
 	rc.query.registerFlag(cmd)
 	rc.alertmgr.registerFlag(cmd)
+	rc.rwConfig.registerFlag(cmd)
 }
 
 // registerRule registers a rule command.
@@ -163,6 +170,14 @@ func registerRule(app *extkingpin.App) {
 		}
 		if (len(conf.query.sdFiles) != 0 || len(conf.query.addrs) != 0) && len(conf.queryConfigYAML) != 0 {
 			return errors.New("--query/--query.sd-files and --query.config* parameters cannot be defined at the same time")
+		}
+
+		// Parse and check remote-write config if it's enabled
+		if conf.rwConfig.remoteWrite {
+			conf.rwConfigYAML, err = conf.rwConfig.remoteWriteConfig.Content()
+			if err != nil {
+				return err
+			}
 		}
 
 		// Parse and check alerting configuration.
@@ -316,25 +331,42 @@ func runRule(
 		// Discover and resolve query addresses.
 		addDiscoveryGroups(g, queryClient, conf.query.dnsSDInterval)
 	}
+	var (
+		appendable storage.Appendable
+		queryable  storage.Queryable
+		db         *tsdb.DB
+	)
 
-	db, err := tsdb.Open(conf.dataDir, log.With(logger, "component", "tsdb"), reg, tsdbOpts)
-	if err != nil {
-		return errors.Wrap(err, "open TSDB")
-	}
+	if conf.rwConfig.remoteWrite {
+		rw, err := remotewrite.NewStorage(logger, reg, "jfdlsfsl")
+		if err != nil {
+			return errors.Wrap(err, "open WAL storage")
+		}
 
-	level.Debug(logger).Log("msg", "removing storage lock file if any")
-	if err := removeLockfileIfAny(logger, conf.dataDir); err != nil {
-		return errors.Wrap(err, "remove storage lock files")
-	}
+		appendable = rw
+		queryable = rw
+	} else {
+		db, err = tsdb.Open(conf.dataDir, log.With(logger, "component", "tsdb"), reg, tsdbOpts)
+		if err != nil {
+			return errors.Wrap(err, "open TSDB")
+		}
 
-	{
-		done := make(chan struct{})
-		g.Add(func() error {
-			<-done
-			return db.Close()
-		}, func(error) {
-			close(done)
-		})
+		level.Debug(logger).Log("msg", "removing storage lock file if any")
+		if err := removeLockfileIfAny(logger, conf.dataDir); err != nil {
+			return errors.Wrap(err, "remove storage lock files")
+		}
+
+		{
+			done := make(chan struct{})
+			g.Add(func() error {
+				<-done
+				return db.Close()
+			}, func(error) {
+				close(done)
+			})
+		}
+		appendable = db
+		queryable = db
 	}
 
 	// Build the Alertmanager clients.
@@ -428,9 +460,9 @@ func runRule(
 			rules.ManagerOptions{
 				NotifyFunc:  notifyFunc,
 				Logger:      logger,
-				Appendable:  db,
+				Appendable:  appendable,
 				ExternalURL: nil,
-				Queryable:   db,
+				Queryable:   queryable,
 				ResendDelay: conf.resendDelay,
 			},
 			queryFuncCreator(logger, queryClients, metrics.duplicatedQuery, metrics.ruleEvalWarnings, conf.query.httpMethod),

@@ -169,7 +169,7 @@ func TestRule(t *testing.T) {
 	testutil.Ok(t, err)
 	testutil.Ok(t, s.StartAndWaitReady(am1, am2))
 
-	r, err := e2ethanos.NewRuler(s.SharedDir(), "1", rulesSubDir, []alert.AlertmanagerConfig{
+	r, err := e2ethanos.NewTSDBRuler(s.SharedDir(), "1", rulesSubDir, []alert.AlertmanagerConfig{
 		{
 			EndpointsConfig: http_util.EndpointsConfig{
 				FileSDConfigs: []http_util.FileSDConfig{
@@ -376,6 +376,74 @@ func TestRule(t *testing.T) {
 	for i, a := range alrts {
 		testutil.Assert(t, a.Labels.Equal(expAlertLabels[i]), "unexpected labels %s", a.Labels)
 	}
+}
+
+// TestStatelessRule verifies that Thanos Ruler can be run in stateless mode where it:
+// evaluates rules against one/more Queriers.
+// record the rule evaluations in a WAL
+// the WAL gets replicated to a Receiver endpoint
+
+func TestStatelessRule(t *testing.T) {
+	t.Parallel()
+
+	s, err := e2e.NewScenario("e2e_test_rule")
+	testutil.Ok(t, err)
+	t.Cleanup(e2ethanos.CleanScenario(t, s))
+
+	_, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	t.Cleanup(cancel)
+
+	// Prepare work dirs.
+	rulesSubDir := filepath.Join("rules")
+	rulesPath := filepath.Join(s.SharedDir(), rulesSubDir)
+	testutil.Ok(t, os.MkdirAll(rulesPath, os.ModePerm))
+	createRuleFiles(t, rulesPath)
+	amTargetsSubDir := filepath.Join("rules_am_targets")
+	testutil.Ok(t, os.MkdirAll(filepath.Join(s.SharedDir(), amTargetsSubDir), os.ModePerm))
+	queryTargetsSubDir := filepath.Join("rules_query_targets")
+	testutil.Ok(t, os.MkdirAll(filepath.Join(s.SharedDir(), queryTargetsSubDir), os.ModePerm))
+
+	am1, err := e2ethanos.NewAlertmanager(s.SharedDir(), "1")
+	testutil.Ok(t, err)
+	am2, err := e2ethanos.NewAlertmanager(s.SharedDir(), "2")
+	testutil.Ok(t, err)
+	testutil.Ok(t, s.StartAndWaitReady(am1, am2))
+
+	r, err := e2ethanos.NewRuler(s.SharedDir(), "1", rulesSubDir, []alert.AlertmanagerConfig{
+		{
+			EndpointsConfig: http_util.EndpointsConfig{
+				FileSDConfigs: []http_util.FileSDConfig{
+					{
+						// FileSD which will be used to register discover dynamically am1.
+						Files:           []string{filepath.Join(e2e.ContainerSharedDir, amTargetsSubDir, "*.yaml")},
+						RefreshInterval: model.Duration(time.Second),
+					},
+				},
+				StaticAddresses: []string{
+					am2.NetworkHTTPEndpoint(),
+				},
+				Scheme: "http",
+			},
+			Timeout:    model.Duration(time.Second),
+			APIVersion: alert.APIv1,
+		},
+	}, []query.Config{
+		{
+			EndpointsConfig: http_util.EndpointsConfig{
+				// We test Statically Addressed queries in other tests. Focus on FileSD here.
+				FileSDConfigs: []http_util.FileSDConfig{
+					{
+						// FileSD which will be used to register discover dynamically q.
+						Files:           []string{filepath.Join(e2e.ContainerSharedDir, queryTargetsSubDir, "*.yaml")},
+						RefreshInterval: model.Duration(time.Second),
+					},
+				},
+				Scheme: "http",
+			},
+		},
+	}, true)
+	testutil.Ok(t, err)
+	testutil.Ok(t, s.StartAndWaitReady(r))
 }
 
 // Test Ruler behavior on different storepb.PartialResponseStrategy when having partial response from single `failingStoreAPI`.
