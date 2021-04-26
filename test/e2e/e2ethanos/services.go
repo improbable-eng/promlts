@@ -414,7 +414,11 @@ func NewReceiverWithConfigWatcher(sharedDir string, networkName string, name str
 	return receiver, nil
 }
 
-func NewRuler(sharedDir string, name string, ruleSubDir string, amCfg []alert.AlertmanagerConfig, queryCfg []query.Config) (*Service, error) {
+func NewTSDBRuler(sharedDir string, name string, ruleSubDir string, amCfg []alert.AlertmanagerConfig, queryCfg []query.Config) (*Service, error) {
+	return NewRuler(sharedDir, name, ruleSubDir, amCfg, queryCfg, false)
+}
+
+func NewRuler(sharedDir string, name string, ruleSubDir string, amCfg []alert.AlertmanagerConfig, queryCfg []query.Config, remoteWrite bool) (*Service, error) {
 	dir := filepath.Join(sharedDir, "data", "rule", name)
 	container := filepath.Join(e2e.ContainerSharedDir, "data", "rule", name)
 	if err := os.MkdirAll(dir, 0750); err != nil {
@@ -433,25 +437,30 @@ func NewRuler(sharedDir string, name string, ruleSubDir string, amCfg []alert.Al
 		return nil, errors.Wrapf(err, "generate query file: %v", queryCfg)
 	}
 
+	ruleArgs := map[string]string{
+		"--debug.name":                    fmt.Sprintf("rule-%v", name),
+		"--grpc-address":                  ":9091",
+		"--grpc-grace-period":             "0s",
+		"--http-address":                  ":8080",
+		"--label":                         fmt.Sprintf(`replica="%s"`, name),
+		"--data-dir":                      container,
+		"--rule-file":                     filepath.Join(e2e.ContainerSharedDir, ruleSubDir, "*.yaml"),
+		"--eval-interval":                 "3s",
+		"--alertmanagers.config":          string(amCfgBytes),
+		"--alertmanagers.sd-dns-interval": "1s",
+		"--log.level":                     infoLogLevel,
+		"--query.config":                  string(queryCfgBytes),
+		"--query.sd-dns-interval":         "1s",
+		"--resend-delay":                  "5s",
+	}
+	if remoteWrite {
+		ruleArgs["--remote-write"] = ""
+	}
+
 	ruler := NewService(
 		fmt.Sprintf("rule-%v", name),
 		DefaultImage(),
-		e2e.NewCommand("rule", e2e.BuildArgs(map[string]string{
-			"--debug.name":                    fmt.Sprintf("rule-%v", name),
-			"--grpc-address":                  ":9091",
-			"--grpc-grace-period":             "0s",
-			"--http-address":                  ":8080",
-			"--label":                         fmt.Sprintf(`replica="%s"`, name),
-			"--data-dir":                      container,
-			"--rule-file":                     filepath.Join(e2e.ContainerSharedDir, ruleSubDir, "*.yaml"),
-			"--eval-interval":                 "3s",
-			"--alertmanagers.config":          string(amCfgBytes),
-			"--alertmanagers.sd-dns-interval": "1s",
-			"--log.level":                     infoLogLevel,
-			"--query.config":                  string(queryCfgBytes),
-			"--query.sd-dns-interval":         "1s",
-			"--resend-delay":                  "5s",
-		})...),
+		e2e.NewCommand("rule", e2e.BuildArgs(ruleArgs)...),
 		e2e.NewHTTPReadinessProbe(8080, "/-/ready", 200, 200),
 		8080,
 		9091,
