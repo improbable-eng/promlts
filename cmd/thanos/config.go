@@ -226,13 +226,13 @@ func (ac *alertMgrConfig) registerFlag(cmd extflag.FlagClause) *alertMgrConfig {
 }
 
 type ruleRWConfig struct {
-	remoteWrite       bool
-	remoteWriteConfig *extflag.PathOrContent
+	remoteWrite bool
+	configPath  *extflag.PathOrContent
 }
 
 func (rc *ruleRWConfig) registerFlag(cmd extflag.FlagClause) *ruleRWConfig {
 	cmd.Flag("remote-write", "If true, directs ruler to remote-write evaluated samples to the server configured by 'remote-write.config'.").
 		BoolVar(&rc.remoteWrite)
-	rc.remoteWriteConfig = extflag.RegisterPathOrContent(cmd, "remote-write.config", "YAML config for the remote-write server where samples should be sent to. See https://thanos.io/tip/components/rule.md/#query-api", false)
+	rc.configPath = extflag.RegisterPathOrContent(cmd, "remote-write.config", "YAML config for the remote-write server where samples should be sent to. See https://thanos.io/tip/components/rule.md/#query-api", false)
 	return rc
 }
