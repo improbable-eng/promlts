@@ -245,6 +245,19 @@ QUERIER_JAEGER_CONFIG=$(
 	EOF
 )
 
+REMOTE_WRITE_FLAGS=""
+if [ -n "${STATELESS_RULER_ENABLED}" ]; then
+  cat >/data/rule-remote-write.yaml <<-EOF
+  name: "thanos-receivers"
+  remote_write:
+    url: "http://127.0.0.1:10908/api/v1/receive"
+    name: "receive-0"
+EOF
+
+  REMOTE_WRITE_FLAGS="--remote-write --remote-write.config-file data/rule-remote-write.yaml
+  "
+fi
+
 # Start Thanos Ruler.
 ${THANOS_EXECUTABLE} rule \
   --data-dir data/ \
@@ -256,6 +269,7 @@ ${THANOS_EXECUTABLE} rule \
   --http-address="0.0.0.0:19999" \
   --grpc-address="0.0.0.0:19998" \
   --label 'rule="true"' \
+  "${REMOTE_WRITE_FLAGS}" \
   ${OBJSTORECFG} &
 
 STORES="${STORES} --store 127.0.0.1:19998"
