@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/thanos-io/thanos/pkg/rules/remotewrite"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -383,32 +384,62 @@ func TestRule(t *testing.T) {
 // record the rule evaluations in a WAL
 // the WAL gets replicated to a Receiver endpoint
 
-func TestStatelessRule(t *testing.T) {
-	t.Parallel()
 
-	s, err := e2e.NewScenario("e2e_test_rule")
+func TestRule_CanRemoteWriteData(t *testing.T) {
+	s, err := e2e.NewScenario("e2e_test_rule_remote_write")
 	testutil.Ok(t, err)
 	t.Cleanup(e2ethanos.CleanScenario(t, s))
 
-	_, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
-	t.Cleanup(cancel)
-
-	// Prepare work dirs.
+	// create rule files
 	rulesSubDir := filepath.Join("rules")
 	rulesPath := filepath.Join(s.SharedDir(), rulesSubDir)
 	testutil.Ok(t, os.MkdirAll(rulesPath, os.ModePerm))
-	createRuleFiles(t, rulesPath)
-	amTargetsSubDir := filepath.Join("rules_am_targets")
+	testAlertRuleRecordAbsentMetric := `
+record: test_absent_metric
+expr: absent(nonexistent{job='thanos-receive'})
+labels:
+  severity: page
+annotations:
+  summary: "tesemole hahaha"
+`
+	createRuleFile(t, filepath.Join(rulesPath, "rw_rule-0.yaml"), testAlertRuleRecordAbsentMetric)
+	amTargetsSubDir := filepath.Join("rw_rules_am_targets")
 	testutil.Ok(t, os.MkdirAll(filepath.Join(s.SharedDir(), amTargetsSubDir), os.ModePerm))
-	queryTargetsSubDir := filepath.Join("rules_query_targets")
+	queryTargetsSubDir := filepath.Join("rw_rules_query_targets")
 	testutil.Ok(t, os.MkdirAll(filepath.Join(s.SharedDir(), queryTargetsSubDir), os.ModePerm))
 
-	am1, err := e2ethanos.NewAlertmanager(s.SharedDir(), "1")
+	receiver, err := e2ethanos.NewReceiver(s.SharedDir(), s.NetworkName(), "1", 1)
 	testutil.Ok(t, err)
-	am2, err := e2ethanos.NewAlertmanager(s.SharedDir(), "2")
-	testutil.Ok(t, err)
-	testutil.Ok(t, s.StartAndWaitReady(am1, am2))
+	testutil.Ok(t, s.StartAndWaitReady(receiver))
 
+	querier, err := e2ethanos.NewQuerier(s.SharedDir(), "1", []string{receiver.GRPCNetworkEndpoint()}, []string{receiver.GRPCNetworkEndpoint()}, nil, nil, nil, nil,  "", "")
+	testutil.Ok(t, err)
+	testutil.Ok(t, s.StartAndWaitReady(querier))
+
+	ctx, cancel := context.WithTimeout(context.Background(), 1 * time.Minute)
+	t.Cleanup(cancel)
+
+	// check that querier can talk to the receiver
+	t.Run("can query from receiver", func(t *testing.T) {
+		testAbsentAlert := "absent(nonexistent{job='thanos-receive'})"
+		queryAndAssertSeries(t, ctx, querier.HTTPEndpoint(), testAbsentAlert, promclient.QueryOptions{
+			Deduplicate: false,
+		}, []model.Metric{
+			{
+				"job": "thanos-receive",
+			},
+		})
+	})
+
+	am, err := e2ethanos.NewAlertmanager(s.SharedDir(), "1")
+	testutil.Ok(t, err)
+	testutil.Ok(t, s.StartAndWaitReady(am))
+
+	rwURL := e2ethanos.RemoteWriteEndpoint(receiver.NetworkEndpoint(8081))
+	fmt.Println(rwURL)
+	testutil.Ok(t, err)
+
+	fmt.Println("AlertManager URL: ", am.HTTPPort())
 	r, err := e2ethanos.NewRuler(s.SharedDir(), "1", rulesSubDir, []alert.AlertmanagerConfig{
 		{
 			EndpointsConfig: http_util.EndpointsConfig{
@@ -420,7 +451,7 @@ func TestStatelessRule(t *testing.T) {
 					},
 				},
 				StaticAddresses: []string{
-					am2.NetworkHTTPEndpoint(),
+					am.NetworkHTTPEndpoint(),
 				},
 				Scheme: "http",
 			},
@@ -441,9 +472,10 @@ func TestStatelessRule(t *testing.T) {
 				Scheme: "http",
 			},
 		},
-	}, true)
+	}, true, remotewrite.Config{})
 	testutil.Ok(t, err)
 	testutil.Ok(t, s.StartAndWaitReady(r))
+	time.Sleep(5 * time.Minute)
 }
 
 // Test Ruler behavior on different storepb.PartialResponseStrategy when having partial response from single `failingStoreAPI`.

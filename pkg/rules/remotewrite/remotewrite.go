@@ -3,6 +3,9 @@ package remotewrite
 import (
 	"errors"
 	"fmt"
+	"sync"
+	"time"
+
 	"github.com/go-kit/kit/log"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/prometheus/config"
@@ -10,18 +13,16 @@ import (
 	"github.com/prometheus/prometheus/storage"
 	"github.com/prometheus/prometheus/storage/remote"
 	"gopkg.in/yaml.v2"
-	"sync"
-	"time"
 )
 
 var (
-	managerMtx            sync.Mutex
+	managerMtx sync.Mutex
 )
 
 type Config struct {
-	Name string `yaml:"name"`
-	RemoteStore *config.RemoteWriteConfig `yaml:"remote_write,omitempty"`
-	ScrapeConfig *config.ScrapeConfig `yaml:"scrape_config,omitempty"`
+	Name         string                    `yaml:"name"`
+	RemoteStore  *config.RemoteWriteConfig `yaml:"remote_write,omitempty"`
+	ScrapeConfig *config.ScrapeConfig      `yaml:"scrape_config,omitempty"`
 }
 
 func LoadRemoteWriteConfig(configYAML []byte) (Config, error) {

@@ -6,6 +6,7 @@ package e2ethanos
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/thanos-io/thanos/pkg/rules/remotewrite"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -415,10 +416,10 @@ func NewReceiverWithConfigWatcher(sharedDir string, networkName string, name str
 }
 
 func NewTSDBRuler(sharedDir string, name string, ruleSubDir string, amCfg []alert.AlertmanagerConfig, queryCfg []query.Config) (*Service, error) {
-	return NewRuler(sharedDir, name, ruleSubDir, amCfg, queryCfg, false)
+	return NewRuler(sharedDir, name, ruleSubDir, amCfg, queryCfg, false, remotewrite.Config{})
 }
 
-func NewRuler(sharedDir string, name string, ruleSubDir string, amCfg []alert.AlertmanagerConfig, queryCfg []query.Config, remoteWrite bool) (*Service, error) {
+func NewRuler(sharedDir string, name string, ruleSubDir string, amCfg []alert.AlertmanagerConfig, queryCfg []query.Config, remoteWrite bool, remoteWriteCfg remotewrite.Config) (*Service, error) {
 	dir := filepath.Join(sharedDir, "data", "rule", name)
 	container := filepath.Join(e2e.ContainerSharedDir, "data", "rule", name)
 	if err := os.MkdirAll(dir, 0750); err != nil {
@@ -454,7 +455,12 @@ func NewRuler(sharedDir string, name string, ruleSubDir string, amCfg []alert.Al
 		"--resend-delay":                  "5s",
 	}
 	if remoteWrite {
+		rwCfgBytes, err := yaml.Marshal(remoteWriteCfg)
+		if err != nil {
+			return nil, errors.Wrapf(err, "generate remote write config: %v", remoteWriteCfg)
+		}
 		ruleArgs["--remote-write"] = ""
+		ruleArgs["--remote-write.config"] = string(rwCfgBytes)
 	}
 
 	ruler := NewService(
