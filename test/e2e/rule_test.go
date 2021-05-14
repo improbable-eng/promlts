@@ -8,9 +8,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	commoncfg "github.com/prometheus/common/config"
+	"github.com/prometheus/prometheus/config"
 	"github.com/thanos-io/thanos/pkg/rules/remotewrite"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"testing"
@@ -379,67 +382,43 @@ func TestRule(t *testing.T) {
 	}
 }
 
-// TestStatelessRule verifies that Thanos Ruler can be run in stateless mode where it:
-// evaluates rules against one/more Queriers.
-// record the rule evaluations in a WAL
-// the WAL gets replicated to a Receiver endpoint
-
-
 func TestRule_CanRemoteWriteData(t *testing.T) {
+	testAlertRuleRecordAbsentMetric := `
+groups:
+- name: example_record_rules
+  interval: 100ms
+  rules:
+  - record: test_absent_metric
+    expr: absent(nonexistent{job='thanos-receive'})
+`
+
 	s, err := e2e.NewScenario("e2e_test_rule_remote_write")
 	testutil.Ok(t, err)
 	t.Cleanup(e2ethanos.CleanScenario(t, s))
 
-	// create rule files
+	_, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	t.Cleanup(cancel)
+
+	// Prepare work dirs.
 	rulesSubDir := filepath.Join("rules")
 	rulesPath := filepath.Join(s.SharedDir(), rulesSubDir)
 	testutil.Ok(t, os.MkdirAll(rulesPath, os.ModePerm))
-	testAlertRuleRecordAbsentMetric := `
-record: test_absent_metric
-expr: absent(nonexistent{job='thanos-receive'})
-labels:
-  severity: page
-annotations:
-  summary: "tesemole hahaha"
-`
-	createRuleFile(t, filepath.Join(rulesPath, "rw_rule-0.yaml"), testAlertRuleRecordAbsentMetric)
-	amTargetsSubDir := filepath.Join("rw_rules_am_targets")
+	createRuleFile(t, filepath.Join(rulesPath, fmt.Sprintf("rules-0.yaml")), testAlertRuleRecordAbsentMetric)
+	amTargetsSubDir := filepath.Join("rules_am_targets")
 	testutil.Ok(t, os.MkdirAll(filepath.Join(s.SharedDir(), amTargetsSubDir), os.ModePerm))
-	queryTargetsSubDir := filepath.Join("rw_rules_query_targets")
+	queryTargetsSubDir := filepath.Join("rules_query_targets")
 	testutil.Ok(t, os.MkdirAll(filepath.Join(s.SharedDir(), queryTargetsSubDir), os.ModePerm))
 
-	receiver, err := e2ethanos.NewReceiver(s.SharedDir(), s.NetworkName(), "1", 1)
 	testutil.Ok(t, err)
-	testutil.Ok(t, s.StartAndWaitReady(receiver))
-
-	querier, err := e2ethanos.NewQuerier(s.SharedDir(), "1", []string{receiver.GRPCNetworkEndpoint()}, []string{receiver.GRPCNetworkEndpoint()}, nil, nil, nil, nil,  "", "")
+	am2, err := e2ethanos.NewAlertmanager(s.SharedDir(), "2")
 	testutil.Ok(t, err)
-	testutil.Ok(t, s.StartAndWaitReady(querier))
+	testutil.Ok(t, s.StartAndWaitReady(am2))
 
-	ctx, cancel := context.WithTimeout(context.Background(), 1 * time.Minute)
-	t.Cleanup(cancel)
 
-	// check that querier can talk to the receiver
-	t.Run("can query from receiver", func(t *testing.T) {
-		testAbsentAlert := "absent(nonexistent{job='thanos-receive'})"
-		queryAndAssertSeries(t, ctx, querier.HTTPEndpoint(), testAbsentAlert, promclient.QueryOptions{
-			Deduplicate: false,
-		}, []model.Metric{
-			{
-				"job": "thanos-receive",
-			},
-		})
-	})
-
-	am, err := e2ethanos.NewAlertmanager(s.SharedDir(), "1")
-	testutil.Ok(t, err)
-	testutil.Ok(t, s.StartAndWaitReady(am))
-
-	rwURL := e2ethanos.RemoteWriteEndpoint(receiver.NetworkEndpoint(8081))
-	fmt.Println(rwURL)
+	//todo: replace am2 with actual receiver
+	rwURL, err := url.Parse(e2ethanos.RemoteWriteEndpoint(am2.NetworkHTTPEndpoint()))
 	testutil.Ok(t, err)
 
-	fmt.Println("AlertManager URL: ", am.HTTPPort())
 	r, err := e2ethanos.NewRuler(s.SharedDir(), "1", rulesSubDir, []alert.AlertmanagerConfig{
 		{
 			EndpointsConfig: http_util.EndpointsConfig{
@@ -451,7 +430,7 @@ annotations:
 					},
 				},
 				StaticAddresses: []string{
-					am.NetworkHTTPEndpoint(),
+					am2.NetworkHTTPEndpoint(),
 				},
 				Scheme: "http",
 			},
@@ -472,9 +451,16 @@ annotations:
 				Scheme: "http",
 			},
 		},
-	}, true, remotewrite.Config{})
+	}, true,  remotewrite.Config{
+		Name: "ruler-rw-receivers",
+		RemoteStore: &config.RemoteWriteConfig{
+			URL: &commoncfg.URL{URL: rwURL},
+			Name: "thanos-receiver",
+		},
+	})
 	testutil.Ok(t, err)
 	testutil.Ok(t, s.StartAndWaitReady(r))
+
 	time.Sleep(5 * time.Minute)
 }
 
