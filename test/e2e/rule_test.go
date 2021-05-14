@@ -383,6 +383,8 @@ func TestRule(t *testing.T) {
 }
 
 func TestRule_CanRemoteWriteData(t *testing.T) {
+	t.Parallel()
+
 	testAlertRuleRecordAbsentMetric := `
 groups:
 - name: example_record_rules
@@ -396,7 +398,7 @@ groups:
 	testutil.Ok(t, err)
 	t.Cleanup(e2ethanos.CleanScenario(t, s))
 
-	_, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	t.Cleanup(cancel)
 
 	// Prepare work dirs.
@@ -409,16 +411,19 @@ groups:
 	queryTargetsSubDir := filepath.Join("rules_query_targets")
 	testutil.Ok(t, os.MkdirAll(filepath.Join(s.SharedDir(), queryTargetsSubDir), os.ModePerm))
 
-	testutil.Ok(t, err)
-	am2, err := e2ethanos.NewAlertmanager(s.SharedDir(), "2")
-	testutil.Ok(t, err)
-	testutil.Ok(t, s.StartAndWaitReady(am2))
 
-
-	//todo: replace am2 with actual receiver
-	rwURL, err := url.Parse(e2ethanos.RemoteWriteEndpoint(am2.NetworkHTTPEndpoint()))
+	am, err := e2ethanos.NewAlertmanager(s.SharedDir(), "1")
 	testutil.Ok(t, err)
+	testutil.Ok(t, s.StartAndWaitReady(am))
 
+	receiver, err := e2ethanos.NewReceiver(s.SharedDir(), s.NetworkName(), "1", 1)
+	testutil.Ok(t, err)
+	testutil.Ok(t, s.StartAndWaitReady(receiver))
+	rwURL, err := url.Parse(e2ethanos.RemoteWriteEndpoint(receiver.NetworkEndpoint(8081)))
+	testutil.Ok(t, err)
+	querier, err := e2ethanos.NewQuerierBuilder(s.SharedDir(), "1", []string{receiver.GRPCNetworkEndpoint()}).Build()
+	testutil.Ok(t, err)
+	testutil.Ok(t, s.StartAndWaitReady(querier))
 	r, err := e2ethanos.NewRuler(s.SharedDir(), "1", rulesSubDir, []alert.AlertmanagerConfig{
 		{
 			EndpointsConfig: http_util.EndpointsConfig{
@@ -430,7 +435,7 @@ groups:
 					},
 				},
 				StaticAddresses: []string{
-					am2.NetworkHTTPEndpoint(),
+					am.NetworkHTTPEndpoint(),
 				},
 				Scheme: "http",
 			},
@@ -461,7 +466,53 @@ groups:
 	testutil.Ok(t, err)
 	testutil.Ok(t, s.StartAndWaitReady(r))
 
-	time.Sleep(5 * time.Minute)
+	writeTargets(t, filepath.Join(s.SharedDir(), queryTargetsSubDir, "targets.yaml"), querier.NetworkHTTPEndpoint())
+	writeTargets(t, filepath.Join(s.SharedDir(), amTargetsSubDir, "targets.yaml"), am.NetworkHTTPEndpoint())
+
+	t.Run("inject samples into receiver to reset its StoreAPI MinTime", func(t *testing.T) {
+		// inject data into receiver to reset its minTime (so it doesn't get filtered out by store)
+		// the sample is injected through a prometheus instance that remote_writes samples into the receiver node
+		prom, _, err := e2ethanos.NewPrometheus(s.SharedDir(), "1", defaultPromConfig("prom", 0, e2ethanos.RemoteWriteEndpoint(receiver.NetworkEndpoint(8081)), ""), e2ethanos.DefaultPrometheusImage())
+		testutil.Ok(t, err)
+		testutil.Ok(t, s.StartAndWaitReady(prom))
+
+		queryAndAssertSeries(t, ctx, querier.HTTPEndpoint(), queryUpWithoutInstance, promclient.QueryOptions{
+			Deduplicate: false,
+		}, []model.Metric{
+			{
+				"job":"myself",
+				"prometheus": "prom",
+				"receive": "1",
+				"replica": "0",
+				"tenant_id": "default-tenant",
+			},
+		})
+	})
+
+	t.Run("query can contact from receiver", func(t *testing.T) {
+		testAbsentQuery := "absent(nonexistent{job='thanos-receive'})"
+		queryAndAssertSeries(t, ctx, querier.HTTPEndpoint(), testAbsentQuery, promclient.QueryOptions{
+			Deduplicate: false,
+		}, []model.Metric{
+			{
+				"job": "thanos-receive",
+			},
+		})
+	})
+
+	t.Run("can fetch remote-written samples from receiver", func(t *testing.T) {
+		testRecordedSamples := "test_absent_metric"
+		queryAndAssertSeries(t, ctx, querier.HTTPEndpoint(), testRecordedSamples, promclient.QueryOptions{
+			Deduplicate: false,
+		}, []model.Metric{
+			{
+				"__name__": "test_absent_metric",
+				"job":"thanos-receive",
+				"receive": "1",
+				"tenant_id": "default-tenant",
+			},
+		})
+	})
 }
 
 // Test Ruler behavior on different storepb.PartialResponseStrategy when having partial response from single `failingStoreAPI`.
