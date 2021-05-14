@@ -357,6 +357,10 @@ func (w *Storage) Appender(_ context.Context) storage.Appender {
 	return w.appenderPool.Get().(storage.Appender)
 }
 
+func (w *Storage) Querier(ctx context.Context, mint, maxt int64) (storage.Querier, error) {
+	return &remoteWriteQueryable{}, nil
+}
+
 // StartTime always returns 0, nil. It is implemented for compatibility with
 // Prometheus, but is unused in the agent.
 func (*Storage) StartTime() (int64, error) {
@@ -674,5 +678,23 @@ func (a *appender) Rollback() error {
 	a.series = a.series[:0]
 	a.samples = a.samples[:0]
 	a.w.appenderPool.Put(a)
+	return nil
+}
+
+type remoteWriteQueryable struct{}
+
+func (r *remoteWriteQueryable) LabelValues(name string, matchers ...*labels.Matcher) ([]string, storage.Warnings, error) {
+	return nil, nil, nil
+}
+
+func (r *remoteWriteQueryable) LabelNames() ([]string, storage.Warnings, error) {
+	return nil, nil, nil
+}
+
+func (r *remoteWriteQueryable) Close() error {
+	return nil
+}
+
+func (r *remoteWriteQueryable) Select(sortSeries bool, hints *storage.SelectHints, matchers ...*labels.Matcher) storage.SeriesSet {
 	return nil
 }
