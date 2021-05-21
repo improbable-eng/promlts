@@ -360,25 +360,27 @@ class Panel extends Component<PanelProps & PathPrefixProps, PanelState> {
         )}
         <Row>
           <Col>
-            <Nav tabs>
-              <NavItem>
-                <NavLink
-                  className={options.type === 'table' ? 'active' : ''}
-                  onClick={() => this.handleChangeType(PanelType.Table)}
-                >
-                  Table
-                </NavLink>
-              </NavItem>
-              <NavItem>
-                <NavLink
-                  className={options.type === 'graph' ? 'active' : ''}
-                  onClick={() => this.handleChangeType(PanelType.Graph)}
-                >
-                  Graph
-                </NavLink>
-              </NavItem>
+            <div>
+              <Nav tabs>
+                <NavItem>
+                  <NavLink
+                    className={options.type === 'table' ? 'active' : ''}
+                    onClick={() => this.handleChangeType(PanelType.Table)}
+                  >
+                    Table
+                  </NavLink>
+                </NavItem>
+                <NavItem>
+                  <NavLink
+                    className={options.type === 'graph' ? 'active' : ''}
+                    onClick={() => this.handleChangeType(PanelType.Graph)}
+                  >
+                    Graph
+                  </NavLink>
+                </NavItem>
+              </Nav>
               {!this.state.loading && !this.state.error && this.state.stats && <QueryStatsView {...this.state.stats} />}
-            </Nav>
+            </div>
             <TabContent activeTab={options.type}>
               <TabPane tabId="table">
                 {options.type === 'table' && (
