@@ -1,3 +1,5 @@
+// This is copied from https://github.com/grafana/agent/blob/a23bd5cf27c2ac99695b7449d38fb12444941a1c/pkg/prom/wal/series.go
+// TODO(idoqo): Migrate to prometheus package when https://github.com/prometheus/prometheus/pull/8785 is ready.
 package remotewrite
 
 import (
@@ -70,8 +72,6 @@ func (m seriesHashmap) del(hash uint64, ref uint64) {
 	for _, s := range m[hash] {
 		if s.ref != ref {
 			rem = append(rem, s)
-		} else {
-			//intern.ReleaseLabels(intern.Global, s.lset)
 		}
 	}
 	if len(rem) == 0 {
