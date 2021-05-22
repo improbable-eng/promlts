@@ -31,13 +31,11 @@ func NewFanoutStorage(logger log.Logger, reg prometheus.Registerer, walDir strin
 		return nil, err
 	}
 	remoteStore := remote.NewStorage(logger, reg, walStore.StartTime, walStore.Directory(), 1*time.Minute, nil)
-	err = remoteStore.ApplyConfig(&config.Config{
+	if err := remoteStore.ApplyConfig(&config.Config{
 		GlobalConfig:       config.DefaultGlobalConfig,
 		RemoteWriteConfigs: []*config.RemoteWriteConfig{rwConfig.RemoteStore},
-	})
-	if err != nil {
+	}); err != nil {
 		return nil, fmt.Errorf("failed applying config to remote storage: %w", err)
 	}
-	fanoutStorage := storage.NewFanout(logger, walStore, remoteStore)
-	return fanoutStorage, nil
+	return storage.NewFanout(logger, walStore, remoteStore), nil
 }
