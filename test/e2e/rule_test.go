@@ -8,16 +8,18 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	commoncfg "github.com/prometheus/common/config"
-	"github.com/prometheus/prometheus/config"
-	"github.com/thanos-io/thanos/pkg/rules/remotewrite"
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
+
+	commoncfg "github.com/prometheus/common/config"
+	"github.com/prometheus/prometheus/config"
+	"github.com/thanos-io/thanos/pkg/rules/remotewrite"
 
 	"github.com/cortexproject/cortex/integration/e2e"
 	"github.com/prometheus/common/model"
@@ -382,10 +384,13 @@ func TestRule(t *testing.T) {
 	}
 }
 
+// TestRule_CanRemoteWriteData checks that Thanos Ruler can be run in stateless mode
+// where it remote_writes rule evaluations to a Prometheus remote-write endpoint (typically
+// a Thanos Receiver).
 func TestRule_CanRemoteWriteData(t *testing.T) {
 	t.Parallel()
 
-	testAlertRuleRecordAbsentMetric := `
+	testRuleRecordAbsentMetric := `
 groups:
 - name: example_record_rules
   interval: 100ms
@@ -401,16 +406,10 @@ groups:
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	t.Cleanup(cancel)
 
-	// Prepare work dirs.
-	rulesSubDir := filepath.Join("rules")
+	rulesSubDir := "rules"
 	rulesPath := filepath.Join(s.SharedDir(), rulesSubDir)
 	testutil.Ok(t, os.MkdirAll(rulesPath, os.ModePerm))
-	createRuleFile(t, filepath.Join(rulesPath, fmt.Sprintf("rules-0.yaml")), testAlertRuleRecordAbsentMetric)
-	amTargetsSubDir := filepath.Join("rules_am_targets")
-	testutil.Ok(t, os.MkdirAll(filepath.Join(s.SharedDir(), amTargetsSubDir), os.ModePerm))
-	queryTargetsSubDir := filepath.Join("rules_query_targets")
-	testutil.Ok(t, os.MkdirAll(filepath.Join(s.SharedDir(), queryTargetsSubDir), os.ModePerm))
-
+	createRuleFile(t, filepath.Join(rulesPath, "rules-0.yaml"), testRuleRecordAbsentMetric)
 
 	am, err := e2ethanos.NewAlertmanager(s.SharedDir(), "1")
 	testutil.Ok(t, err)
@@ -427,13 +426,6 @@ groups:
 	r, err := e2ethanos.NewRuler(s.SharedDir(), "1", rulesSubDir, []alert.AlertmanagerConfig{
 		{
 			EndpointsConfig: http_util.EndpointsConfig{
-				FileSDConfigs: []http_util.FileSDConfig{
-					{
-						// FileSD which will be used to register discover dynamically am1.
-						Files:           []string{filepath.Join(e2e.ContainerSharedDir, amTargetsSubDir, "*.yaml")},
-						RefreshInterval: model.Duration(time.Second),
-					},
-				},
 				StaticAddresses: []string{
 					am.NetworkHTTPEndpoint(),
 				},
@@ -445,29 +437,21 @@ groups:
 	}, []query.Config{
 		{
 			EndpointsConfig: http_util.EndpointsConfig{
-				// We test Statically Addressed queries in other tests. Focus on FileSD here.
-				FileSDConfigs: []http_util.FileSDConfig{
-					{
-						// FileSD which will be used to register discover dynamically q.
-						Files:           []string{filepath.Join(e2e.ContainerSharedDir, queryTargetsSubDir, "*.yaml")},
-						RefreshInterval: model.Duration(time.Second),
-					},
+				StaticAddresses: []string{
+					querier.NetworkHTTPEndpoint(),
 				},
 				Scheme: "http",
 			},
 		},
-	}, true,  remotewrite.Config{
+	}, true, remotewrite.Config{
 		Name: "ruler-rw-receivers",
 		RemoteStore: &config.RemoteWriteConfig{
-			URL: &commoncfg.URL{URL: rwURL},
+			URL:  &commoncfg.URL{URL: rwURL},
 			Name: "thanos-receiver",
 		},
 	})
 	testutil.Ok(t, err)
 	testutil.Ok(t, s.StartAndWaitReady(r))
-
-	writeTargets(t, filepath.Join(s.SharedDir(), queryTargetsSubDir, "targets.yaml"), querier.NetworkHTTPEndpoint())
-	writeTargets(t, filepath.Join(s.SharedDir(), amTargetsSubDir, "targets.yaml"), am.NetworkHTTPEndpoint())
 
 	t.Run("inject samples into receiver to reset its StoreAPI MinTime", func(t *testing.T) {
 		// inject data into receiver to reset its minTime (so it doesn't get filtered out by store)
@@ -480,11 +464,11 @@ groups:
 			Deduplicate: false,
 		}, []model.Metric{
 			{
-				"job":"myself",
+				"job":        "myself",
 				"prometheus": "prom",
-				"receive": "1",
-				"replica": "0",
-				"tenant_id": "default-tenant",
+				"receive":    "1",
+				"replica":    "0",
+				"tenant_id":  "default-tenant",
 			},
 		})
 	})
@@ -506,13 +490,19 @@ groups:
 			Deduplicate: false,
 		}, []model.Metric{
 			{
-				"__name__": "test_absent_metric",
-				"job":"thanos-receive",
-				"receive": "1",
+				"__name__":  "test_absent_metric",
+				"job":       "thanos-receive",
+				"receive":   "1",
 				"tenant_id": "default-tenant",
 			},
 		})
 	})
+}
+
+// TestRule_CanPersistWALData checks that in stateless mode, Thanos Ruler can persist rule evaluations
+// which couldn't be sent to the remote write endpoint (e.g because receiver isn't available).
+func TestRule_CanPersistWALData(t *testing.T) {
+	//TODO: Implement test with unavailable remote-write endpoint(receiver)
 }
 
 // Test Ruler behavior on different storepb.PartialResponseStrategy when having partial response from single `failingStoreAPI`.
