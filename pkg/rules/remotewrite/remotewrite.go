@@ -13,8 +13,8 @@ import (
 )
 
 type Config struct {
-	Name         string                    `yaml:"name"`
-	RemoteStore  *config.RemoteWriteConfig `yaml:"remote_write,omitempty"`
+	Name        string                    `yaml:"name"`
+	RemoteStore *config.RemoteWriteConfig `yaml:"remote_write,omitempty"`
 }
 
 func LoadRemoteWriteConfig(configYAML []byte) (Config, error) {

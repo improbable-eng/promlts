@@ -6,13 +6,14 @@ package e2ethanos
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/thanos-io/thanos/pkg/rules/remotewrite"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/thanos-io/thanos/pkg/rules/remotewrite"
 
 	"github.com/cortexproject/cortex/integration/e2e"
 	"github.com/cortexproject/cortex/pkg/util"
