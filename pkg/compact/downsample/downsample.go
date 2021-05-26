@@ -101,17 +101,22 @@ func Downsample(
 	}
 
 	var (
-		aggrChunks []*AggrChunk
-		all        []sample
-		chks       []chunks.Meta
-		lset       labels.Labels
-		reuseIt    chunkenc.Iterator
+		aggrChunks          []*AggrChunk
+		all                 []sample
+		chks                []chunks.Meta
+		lset                labels.Labels
+		reuseIt             chunkenc.Iterator
+		downsampledChksIter chunks.Iterator
 	)
+
 	for postings.Next() {
+		var numSamples int
+
 		lset = lset[:0]
 		chks = chks[:0]
 		all = all[:0]
 		aggrChunks = aggrChunks[:0]
+		mint, maxt := int64(math.MaxInt64), int64(math.MinInt64)
 
 		// Get series labels and chunks. Downsampled data is sensitive to chunk boundaries
 		// and we need to preserve them to properly downsample previously downsampled data.
@@ -133,19 +138,21 @@ func Downsample(
 				return id, errors.Wrapf(err, "get chunk %d, series %d", c.Ref, postings.At())
 			}
 			chks[i].Chunk = chk
+
+			if c.MinTime < mint {
+				mint = c.MinTime
+			}
+			if c.MaxTime > maxt {
+				maxt = c.MaxTime
+			}
+
+			numSamples += c.Chunk.NumSamples()
 		}
 
 		// Raw and already downsampled data need different processing.
 		if origMeta.Thanos.Downsample.Resolution == 0 {
-			for _, c := range chks {
-				// TODO(bwplotka): We can optimze this further by using in WriteSeries iterators of each chunk instead of
-				// samples. Also ensure 120 sample limit, otherwise we have gigantic chunks.
-				// https://github.com/thanos-io/thanos/issues/2542.
-				if err := expandChunkIterator(c.Chunk.Iterator(reuseIt), &all); err != nil {
-					return id, errors.Wrapf(err, "expand chunk %d, series %d", c.Ref, postings.At())
-				}
-			}
-			if err := streamedBlockWriter.WriteSeries(lset, DownsampleRaw(all, resolution)); err != nil {
+			downsampledChksIter = DownsampleRaw(chks, &all, reuseIt, numSamples, mint, maxt, resolution)
+			if err := streamedBlockWriter.WriteSeries(lset, downsampledChksIter); err != nil {
 				return id, errors.Wrapf(err, "downsample raw data, series: %d", postings.At())
 			}
 		} else {
@@ -157,18 +164,17 @@ func Downsample(
 				}
 				aggrChunks = append(aggrChunks, ac)
 			}
-			downsampledChunks, err := downsampleAggr(
+			downsampledChksIter = downsampleAggr(
 				aggrChunks,
 				&all,
-				chks[0].MinTime,
-				chks[len(chks)-1].MaxTime,
+				reuseIt,
+				numSamples,
+				mint,
+				maxt,
 				origMeta.Thanos.Downsample.Resolution,
 				resolution,
 			)
-			if err != nil {
-				return id, errors.Wrapf(err, "downsample aggregate block, series: %d", postings.At())
-			}
-			if err := streamedBlockWriter.WriteSeries(lset, downsampledChunks); err != nil {
+			if err := streamedBlockWriter.WriteSeries(lset, downsampledChksIter); err != nil {
 				return id, errors.Wrapf(err, "write series: %d", postings.At())
 			}
 		}
@@ -317,51 +323,162 @@ func (b *aggrChunkBuilder) encode() chunks.Meta {
 }
 
 // DownsampleRaw create a series of aggregation chunks for the given sample data.
-func DownsampleRaw(data []sample, resolution int64) []chunks.Meta {
-	if len(data) == 0 {
-		return nil
-	}
-
-	mint, maxt := data[0].t, data[len(data)-1].t
+func DownsampleRaw(data []chunks.Meta, buf *[]sample, reuseIt chunkenc.Iterator, numSamples int, mint, maxt, resolution int64) chunks.Iterator {
 	// We assume a raw resolution of 1 minute. In practice it will often be lower
 	// but this is sufficient for our heuristic to produce well-sized chunks.
-	numChunks := targetChunkCount(mint, maxt, 1*60*1000, resolution, len(data))
-	return downsampleRawLoop(data, resolution, numChunks)
+	numChunks := targetChunkCount(mint, maxt, 1*60*1000, resolution, numSamples)
+	batchSize := (numSamples / numChunks) + 1
+	return newDownsampleRawIterator(data, buf, reuseIt, batchSize, resolution)
 }
 
-func downsampleRawLoop(data []sample, resolution int64, numChunks int) []chunks.Meta {
-	batchSize := (len(data) / numChunks) + 1
-	chks := make([]chunks.Meta, 0, numChunks)
+type downsampleRawIterator struct {
+	batchSize  int
+	chunks     []chunks.Meta
+	chkIdx     int
+	resolution int64
+	lastT      int64
+	err        error
+	buf        *[]sample
+	reuseIt    chunkenc.Iterator
 
-	for len(data) > 0 {
-		j := batchSize
-		if j > len(data) {
-			j = len(data)
-		}
-		curW := currentWindow(data[j-1].t, resolution)
+	sampleOuterWindow *sample
+	curr              chunks.Meta
+	curChkIter        chunkenc.Iterator
+}
 
-		// The batch we took might end in the middle of a downsampling window. We additionally grab
-		// all further samples in the window to keep our samples regular.
-		for ; j < len(data) && data[j].t <= curW; j++ {
-		}
+func newDownsampleRawIterator(chks []chunks.Meta, buf *[]sample, reuseIt chunkenc.Iterator, batchSize int, resolution int64) *downsampleRawIterator {
+	return &downsampleRawIterator{
+		buf:        buf,
+		batchSize:  batchSize,
+		chunks:     chks,
+		chkIdx:     0,
+		resolution: resolution,
+		reuseIt:    reuseIt,
+	}
+}
 
-		batch := data[:j]
-		data = data[j:]
-
-		ab := newAggrChunkBuilder()
-
-		// Encode first raw value; see ApplyCounterResetsSeriesIterator.
-		ab.apps[AggrCounter].Append(batch[0].t, batch[0].v)
-
-		lastT := downsampleBatch(batch, resolution, ab.add)
-
-		// Encode last raw value; see ApplyCounterResetsSeriesIterator.
-		ab.apps[AggrCounter].Append(lastT, batch[len(batch)-1].v)
-
-		chks = append(chks, ab.encode())
+func (a *downsampleRawIterator) Next() bool {
+	if a.chkIdx >= len(a.chunks) {
+		return false
 	}
 
-	return chks
+	if a.curChkIter == nil {
+		a.curChkIter = a.chunks[a.chkIdx].Chunk.Iterator(a.reuseIt)
+	}
+
+	var (
+		t int64
+		v float64
+	)
+	*a.buf = (*a.buf)[:0]
+	batchSize := a.batchSize
+
+	// Check if there is a sample outside the window last time.
+	if a.sampleOuterWindow != nil {
+		t = a.sampleOuterWindow.t
+		a.lastT = t
+		*a.buf = append(*a.buf, *a.sampleOuterWindow)
+		batchSize--
+		a.sampleOuterWindow = nil
+	}
+
+OUTER:
+	for batchSize > 0 {
+		for a.curChkIter.Next() {
+			t, v = a.curChkIter.At()
+			if value.IsStaleNaN(v) {
+				continue
+			}
+
+			if t < a.lastT {
+				continue
+			}
+
+			a.lastT = t
+			*a.buf = append(*a.buf, sample{t, v})
+			batchSize--
+			if batchSize == 0 {
+				break OUTER
+			}
+		}
+
+		if a.err = a.curChkIter.Err(); a.err != nil {
+			return false
+		}
+
+		a.chkIdx++
+		if a.chkIdx >= len(a.chunks) {
+			break OUTER
+		}
+		a.curChkIter = a.chunks[a.chkIdx].Chunk.Iterator(a.reuseIt)
+		a.lastT = 0
+		continue OUTER
+	}
+
+	if len(*a.buf) == 0 {
+		return false
+	}
+
+	curW := currentWindow(t, a.resolution)
+
+	// The batch we took might end in the middle of a downsampling window. We additionally grab
+	// all further samples in the window to keep our samples regular.
+WindowOuter:
+	for a.chkIdx < len(a.chunks) {
+		for a.curChkIter.Next() {
+			t, v = a.curChkIter.At()
+			if value.IsStaleNaN(v) {
+				continue
+			}
+
+			if t < a.lastT {
+				continue
+			}
+
+			// This sample belongs to the next time window so we
+			// save it here and check it at next call.
+			if t > curW {
+				a.sampleOuterWindow = &sample{t, v}
+				break WindowOuter
+			}
+			a.lastT = t
+			*a.buf = append(*a.buf, sample{t, v})
+		}
+		if a.err = a.curChkIter.Err(); a.err != nil {
+			return false
+		}
+
+		a.chkIdx++
+		if a.chkIdx >= len(a.chunks) {
+			break WindowOuter
+		}
+		a.curChkIter = a.chunks[a.chkIdx].Chunk.Iterator(a.reuseIt)
+		a.lastT = 0
+		continue WindowOuter
+	}
+
+	ab := newAggrChunkBuilder()
+
+	firstSample := (*a.buf)[0]
+	lastSample := (*a.buf)[len(*a.buf)-1]
+	// Encode first raw value; see ApplyCounterResetsSeriesIterator.
+	ab.apps[AggrCounter].Append(firstSample.t, firstSample.v)
+
+	lastT := downsampleBatch(*a.buf, a.resolution, ab.add)
+
+	// Encode last raw value; see ApplyCounterResetsSeriesIterator.
+	ab.apps[AggrCounter].Append(lastT, lastSample.v)
+
+	a.curr = ab.encode()
+	return true
+}
+
+func (a *downsampleRawIterator) At() chunks.Meta {
+	return a.curr
+}
+
+func (a *downsampleRawIterator) Err() error {
+	return a.err
 }
 
 // downsampleBatch aggregates the data over the given resolution and calls add each time
@@ -400,39 +517,65 @@ func downsampleBatch(data []sample, resolution int64, add func(int64, *aggregato
 }
 
 // downsampleAggr downsamples a sequence of aggregation chunks to the given resolution.
-func downsampleAggr(chks []*AggrChunk, buf *[]sample, mint, maxt, inRes, outRes int64) ([]chunks.Meta, error) {
-	var numSamples int
-	for _, c := range chks {
-		numSamples += c.NumSamples()
-	}
+func downsampleAggr(chks []*AggrChunk, buf *[]sample, reuseIt chunkenc.Iterator, numSamples int, mint, maxt, inRes, outRes int64) chunks.Iterator {
 	numChunks := targetChunkCount(mint, maxt, inRes, outRes, numSamples)
-	return downsampleAggrLoop(chks, buf, outRes, numChunks)
+	batchSize := len(chks) / numChunks
+	return newDownsampleAggrIterator(chks, buf, reuseIt, batchSize, outRes)
 }
 
-func downsampleAggrLoop(chks []*AggrChunk, buf *[]sample, resolution int64, numChunks int) ([]chunks.Meta, error) {
+type downsampleAggrIterator struct {
+	batchSize  int
+	chunks     []*AggrChunk
+	resolution int64
+	err        error
+	buf        *[]sample
+	reuseIt    chunkenc.Iterator
+
+	curr chunks.Meta
+}
+
+func newDownsampleAggrIterator(chks []*AggrChunk, buf *[]sample, reuseIt chunkenc.Iterator, batchSize int, resolution int64) *downsampleAggrIterator {
+	return &downsampleAggrIterator{
+		buf:        buf,
+		batchSize:  batchSize,
+		chunks:     chks,
+		resolution: resolution,
+		reuseIt:    reuseIt,
+	}
+}
+
+func (a *downsampleAggrIterator) Next() bool {
 	// We downsample aggregates only along chunk boundaries. This is required
 	// for counters to be downsampled correctly since a chunk's first and last
 	// counter values are the true values of the original series. We need
 	// to preserve them even across multiple aggregation iterations.
-	res := make([]chunks.Meta, 0, numChunks)
-	batchSize := len(chks) / numChunks
-
-	for len(chks) > 0 {
-		j := batchSize
-		if j > len(chks) {
-			j = len(chks)
+	if len(a.chunks) > 0 {
+		j := a.batchSize
+		if j > len(a.chunks) {
+			j = len(a.chunks)
 		}
-		part := chks[:j]
-		chks = chks[j:]
+		part := a.chunks[:j]
+		a.chunks = a.chunks[j:]
 
-		chk, err := downsampleAggrBatch(part, buf, resolution)
+		chk, err := downsampleAggrBatch(part, a.buf, a.reuseIt, a.resolution)
 		if err != nil {
-			return nil, err
+			a.err = err
+			return false
 		}
-		res = append(res, chk)
+
+		a.curr = chk
+		return true
 	}
 
-	return res, nil
+	return false
+}
+
+func (a *downsampleAggrIterator) At() chunks.Meta {
+	return a.curr
+}
+
+func (a *downsampleAggrIterator) Err() error {
+	return a.err
 }
 
 // expandChunkIterator reads all samples from the iterator and appends them to buf.
@@ -455,10 +598,9 @@ func expandChunkIterator(it chunkenc.Iterator, buf *[]sample) error {
 	return it.Err()
 }
 
-func downsampleAggrBatch(chks []*AggrChunk, buf *[]sample, resolution int64) (chk chunks.Meta, err error) {
+func downsampleAggrBatch(chks []*AggrChunk, buf *[]sample, reuseIt chunkenc.Iterator, resolution int64) (chk chunks.Meta, err error) {
 	ab := &aggrChunkBuilder{}
 	mint, maxt := int64(math.MaxInt64), int64(math.MinInt64)
-	var reuseIt chunkenc.Iterator
 
 	// do does a generic aggregation for count, sum, min, and max aggregates.
 	// Counters need special treatment.
@@ -563,6 +705,14 @@ func downsampleAggrBatch(chks []*AggrChunk, buf *[]sample, resolution int64) (ch
 type sample struct {
 	t int64
 	v float64
+}
+
+func (s sample) T() int64 {
+	return s.t
+}
+
+func (s sample) V() float64 {
+	return s.v
 }
 
 // ApplyCounterResetsSeriesIterator generates monotonically increasing values by iterating
