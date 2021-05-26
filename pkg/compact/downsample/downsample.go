@@ -146,7 +146,7 @@ func Downsample(
 				maxt = c.MaxTime
 			}
 
-			numSamples += c.Chunk.NumSamples()
+			numSamples += chks[i].Chunk.NumSamples()
 		}
 
 		// Raw and already downsampled data need different processing.
