@@ -172,8 +172,8 @@ func registerRule(app *extkingpin.App) {
 			return errors.New("--query/--query.sd-files and --query.config* parameters cannot be defined at the same time")
 		}
 
-		// Parse and check remote-write config if it's enabled
-		if conf.rwConfig.remoteWrite {
+		// Parse and check remote-write config and enable stateless mode for ruler.
+		if conf.rwConfig.configPath != nil {
 			conf.rwConfigYAML, err = conf.rwConfig.configPath.Content()
 			if err != nil {
 				return err
@@ -337,7 +337,7 @@ func runRule(
 		db         *tsdb.DB
 	)
 
-	if conf.rwConfig.remoteWrite {
+	if conf.rwConfig.configPath != nil {
 		conf.rwConfigYAML, err = conf.rwConfig.configPath.Content()
 		if err != nil {
 			return err

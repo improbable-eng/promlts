@@ -452,10 +452,14 @@ func NewRoutingAndIngestingReceiverWithConfigWatcher(sharedDir string, networkNa
 }
 
 func NewTSDBRuler(sharedDir string, name string, ruleSubDir string, amCfg []alert.AlertmanagerConfig, queryCfg []query.Config) (*Service, error) {
-	return NewRuler(sharedDir, name, ruleSubDir, amCfg, queryCfg, false, remotewrite.Config{})
+	return newRuler(sharedDir, name, ruleSubDir, amCfg, queryCfg, nil)
 }
 
-func NewRuler(sharedDir string, name string, ruleSubDir string, amCfg []alert.AlertmanagerConfig, queryCfg []query.Config, remoteWrite bool, remoteWriteCfg remotewrite.Config) (*Service, error) {
+func NewStatelessRuler(sharedDir string, name string, ruleSubDir string, amCfg []alert.AlertmanagerConfig, queryCfg []query.Config, remoteWriteCfg *remotewrite.Config) (*Service, error) {
+	return newRuler(sharedDir, name, ruleSubDir, amCfg, queryCfg, remoteWriteCfg)
+}
+
+func newRuler(sharedDir string, name string, ruleSubDir string, amCfg []alert.AlertmanagerConfig, queryCfg []query.Config, remoteWriteCfg *remotewrite.Config) (*Service, error) {
 	dir := filepath.Join(sharedDir, "data", "rule", name)
 	container := filepath.Join(e2e.ContainerSharedDir, "data", "rule", name)
 	if err := os.MkdirAll(dir, 0750); err != nil {
@@ -490,12 +494,11 @@ func NewRuler(sharedDir string, name string, ruleSubDir string, amCfg []alert.Al
 		"--query.sd-dns-interval":         "1s",
 		"--resend-delay":                  "5s",
 	}
-	if remoteWrite {
+	if remoteWriteCfg != nil {
 		rwCfgBytes, err := yaml.Marshal(remoteWriteCfg)
 		if err != nil {
 			return nil, errors.Wrapf(err, "generate remote write config: %v", remoteWriteCfg)
 		}
-		ruleArgs["--remote-write"] = ""
 		ruleArgs["--remote-write.config"] = string(rwCfgBytes)
 	}
 

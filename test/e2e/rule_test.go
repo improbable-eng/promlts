@@ -11,13 +11,12 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
-	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
-	commoncfg "github.com/prometheus/common/config"
+	common_cfg "github.com/prometheus/common/config"
 	"github.com/prometheus/prometheus/config"
 	"github.com/thanos-io/thanos/pkg/rules/remotewrite"
 
@@ -423,7 +422,7 @@ groups:
 	querier, err := e2ethanos.NewQuerierBuilder(s.SharedDir(), "1", []string{receiver.GRPCNetworkEndpoint()}).Build()
 	testutil.Ok(t, err)
 	testutil.Ok(t, s.StartAndWaitReady(querier))
-	r, err := e2ethanos.NewRuler(s.SharedDir(), "1", rulesSubDir, []alert.AlertmanagerConfig{
+	r, err := e2ethanos.NewStatelessRuler(s.SharedDir(), "1", rulesSubDir, []alert.AlertmanagerConfig{
 		{
 			EndpointsConfig: http_util.EndpointsConfig{
 				StaticAddresses: []string{
@@ -443,46 +442,15 @@ groups:
 				Scheme: "http",
 			},
 		},
-	}, true, remotewrite.Config{
+	}, &remotewrite.Config{
 		Name: "ruler-rw-receivers",
 		RemoteStore: &config.RemoteWriteConfig{
-			URL:  &commoncfg.URL{URL: rwURL},
+			URL:  &common_cfg.URL{URL: rwURL},
 			Name: "thanos-receiver",
 		},
 	})
 	testutil.Ok(t, err)
 	testutil.Ok(t, s.StartAndWaitReady(r))
-
-	t.Run("inject samples into receiver to reset its StoreAPI MinTime", func(t *testing.T) {
-		// inject data into receiver to reset its minTime (so it doesn't get filtered out by store)
-		// the sample is injected through a prometheus instance that remote_writes samples into the receiver node
-		prom, _, err := e2ethanos.NewPrometheus(s.SharedDir(), "1", defaultPromConfig("prom", 0, e2ethanos.RemoteWriteEndpoint(receiver.NetworkEndpoint(8081)), ""), e2ethanos.DefaultPrometheusImage())
-		testutil.Ok(t, err)
-		testutil.Ok(t, s.StartAndWaitReady(prom))
-
-		queryAndAssertSeries(t, ctx, querier.HTTPEndpoint(), queryUpWithoutInstance, promclient.QueryOptions{
-			Deduplicate: false,
-		}, []model.Metric{
-			{
-				"job":        "myself",
-				"prometheus": "prom",
-				"receive":    "1",
-				"replica":    "0",
-				"tenant_id":  "default-tenant",
-			},
-		})
-	})
-
-	t.Run("query can contact from receiver", func(t *testing.T) {
-		testAbsentQuery := "absent(nonexistent{job='thanos-receive'})"
-		queryAndAssertSeries(t, ctx, querier.HTTPEndpoint(), testAbsentQuery, promclient.QueryOptions{
-			Deduplicate: false,
-		}, []model.Metric{
-			{
-				"job": "thanos-receive",
-			},
-		})
-	})
 
 	t.Run("can fetch remote-written samples from receiver", func(t *testing.T) {
 		testRecordedSamples := "test_absent_metric"
