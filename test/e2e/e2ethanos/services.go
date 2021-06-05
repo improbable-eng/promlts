@@ -136,6 +136,7 @@ type QuerierBuilder struct {
 	metadataAddresses    []string
 	targetAddresses      []string
 	exemplarAddresses    []string
+	endpoints            []string
 
 	tracingConfig string
 }
@@ -165,6 +166,11 @@ func (q *QuerierBuilder) WithTargetAddresses(targetAddresses []string) *QuerierB
 
 func (q *QuerierBuilder) WithExemplarAddresses(exemplarAddresses []string) *QuerierBuilder {
 	q.exemplarAddresses = exemplarAddresses
+	return q
+}
+
+func (q *QuerierBuilder) WithEndpoints(endpoints []string) *QuerierBuilder {
+	q.endpoints = endpoints
 	return q
 }
 
@@ -220,6 +226,10 @@ func (q *QuerierBuilder) Build() (*Service, error) {
 
 	for _, addr := range q.exemplarAddresses {
 		args = append(args, "--exemplar="+addr)
+	}
+
+	for _, addr := range q.endpoints {
+		args = append(args, "--endpoint="+addr)
 	}
 
 	if len(q.fileSDStoreAddresses) > 0 {

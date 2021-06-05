@@ -719,7 +719,7 @@ func (s *StoreSet) getActiveStores(ctx context.Context, stores map[string]*store
 			}
 
 			s.updateStoreStatus(st, nil)
-			st.UpdateWithStore(labelSets, minTime, maxTime, component.Sidecar, store, rule, target, metadata, exemplar)
+			st.UpdateWithStore(labelSets, minTime, maxTime, component.FromString(info.ComponentType), store, rule, target, metadata, exemplar)
 
 			mtx.Lock()
 			defer mtx.Unlock()
