@@ -254,8 +254,7 @@ if [ -n "${STATELESS_RULER_ENABLED}" ]; then
     name: "receive-0"
 EOF
 
-  REMOTE_WRITE_FLAGS="--remote-write --remote-write.config-file data/rule-remote-write.yaml
-  "
+  REMOTE_WRITE_FLAGS="--remote-write.config-file data/rule-remote-write.yaml"
 fi
 
 # Start Thanos Ruler.

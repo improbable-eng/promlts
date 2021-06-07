@@ -78,8 +78,7 @@ type ruleConfig struct {
 	alertQueryURL          *url.URL
 	alertRelabelConfigYAML []byte
 
-	rwConfig     ruleRWConfig
-	rwConfigYAML []byte
+	rwConfig *extflag.PathOrContent
 
 	resendDelay    time.Duration
 	evalInterval   time.Duration
@@ -97,7 +96,6 @@ func (rc *ruleConfig) registerFlag(cmd extkingpin.FlagClause) {
 	rc.shipper.registerFlag(cmd)
 	rc.query.registerFlag(cmd)
 	rc.alertmgr.registerFlag(cmd)
-	rc.rwConfig.registerFlag(cmd)
 }
 
 // registerRule registers a rule command.
@@ -124,6 +122,8 @@ func registerRule(app *extkingpin.App) {
 		Default("1m").DurationVar(&conf.resendDelay)
 	cmd.Flag("eval-interval", "The default evaluation interval to use.").
 		Default("30s").DurationVar(&conf.evalInterval)
+
+	conf.rwConfig = extflag.RegisterPathOrContent(cmd, "remote-write.config", "YAML config for the remote-write server where samples should be sent to. This automatically enables stateless mode for ruler and no series will be stored in the ruler's TSDB. If an empty config (or file) is provided, the flag is ignored and ruler is run with its own TSDB.", extflag.WithEnvSubstitution())
 
 	reqLogDecision := cmd.Flag("log.request.decision", "Deprecation Warning - This flag would be soon deprecated, and replaced with `request.logging-config`. Request Logging for logging the start and end of requests. By default this flag is disabled. LogFinishCall: Logs the finish call of the requests. LogStartAndFinishCall: Logs the start and finish call of the requests. NoLogCall: Disable request logging.").Default("").Enum("NoLogCall", "LogFinishCall", "LogStartAndFinishCall", "")
 
@@ -170,14 +170,6 @@ func registerRule(app *extkingpin.App) {
 		}
 		if (len(conf.query.sdFiles) != 0 || len(conf.query.addrs) != 0) && len(conf.queryConfigYAML) != 0 {
 			return errors.New("--query/--query.sd-files and --query.config* parameters cannot be defined at the same time")
-		}
-
-		// Parse and check remote-write config and enable stateless mode for ruler.
-		if conf.rwConfig.configPath != nil {
-			conf.rwConfigYAML, err = conf.rwConfig.configPath.Content()
-			if err != nil {
-				return err
-			}
 		}
 
 		// Parse and check alerting configuration.
@@ -337,16 +329,14 @@ func runRule(
 		db         *tsdb.DB
 	)
 
-	if conf.rwConfig.configPath != nil {
-		conf.rwConfigYAML, err = conf.rwConfig.configPath.Content()
-		if err != nil {
-			return err
-		}
+	rwCfgYAML, err := conf.rwConfig.Content()
+	if err != nil {
+		return err
+	}
+
+	if len(rwCfgYAML) > 0 {
 		var rwCfg remotewrite.Config
-		if len(conf.rwConfigYAML) == 0 {
-			return errors.New("no --remote-write.config was given")
-		}
-		rwCfg, err = remotewrite.LoadRemoteWriteConfig(conf.rwConfigYAML)
+		rwCfg, err = remotewrite.LoadRemoteWriteConfig(rwCfgYAML)
 		if err != nil {
 			return err
 		}

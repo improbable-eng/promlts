@@ -104,6 +104,11 @@ func (c *walDataCollector) Append(samples []record.RefSample) bool {
 	return true
 }
 
+func (c *walDataCollector) AppendExemplars([]record.RefExemplar) bool {
+	// dummy implementation to make walDataCollector conform to the WriteTo interface
+	return true
+}
+
 func (c *walDataCollector) StoreSeries(series []record.RefSeries, _ int) {
 	c.mut.Lock()
 	defer c.mut.Unlock()

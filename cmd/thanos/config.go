@@ -224,12 +224,3 @@ func (ac *alertMgrConfig) registerFlag(cmd extflag.FlagClause) *alertMgrConfig {
 	ac.alertRelabelConfigPath = extflag.RegisterPathOrContent(cmd, "alert.relabel-config", "YAML file that contains alert relabelling configuration.", extflag.WithEnvSubstitution())
 	return ac
 }
-
-type ruleRWConfig struct {
-	configPath *extflag.PathOrContent
-}
-
-func (rc *ruleRWConfig) registerFlag(cmd extflag.FlagClause) *ruleRWConfig {
-	rc.configPath = extflag.RegisterPathOrContent(cmd, "remote-write.config", "YAML config for the remote-write server where samples should be sent to. This automatically enables stateless mode for ruler and no series will be stored in the ruler's TSDB. See https://thanos.io/tip/components/rule.md/#query-api", false)
-	return rc
-}
