@@ -53,6 +53,14 @@ func RegisterInfoServer(infoSrv infopb.InfoServer) func(*grpc.Server) {
 
 func (srv *InfoServer) Info(ctx context.Context, req *infopb.InfoRequest) (*infopb.InfoResponse, error) {
 
+	if srv.getStoreInfo == nil {
+		srv.getStoreInfo = func() *infopb.StoreInfo { return nil }
+	}
+
+	if srv.getExemplarsInfo == nil {
+		srv.getExemplarsInfo = func() *infopb.ExemplarsInfo { return nil }
+	}
+
 	if srv.getRulesInfo == nil {
 		srv.getRulesInfo = func() *infopb.RulesInfo { return nil }
 	}
