@@ -15,6 +15,7 @@ We use _breaking :warning:_ to mark changes that are not backward compatible (re
 ### Added
 
 - [#4299](https://github.com/thanos-io/thanos/pull/4299) Tracing: Add tracing to exemplar APIs.
+- [#4231](https://github.com/thanos-io/thanos/pull/4231) Receiver: Added Dual Mode for receiver component
 
 ### Fixed
 
