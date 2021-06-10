@@ -348,7 +348,7 @@ func (s seriesList) SeriesNames() []string {
 	return names
 }
 
-// ExpectedSamples returns the list of expected samples, sorted by ref ID and timestamp
+// ExpectedSamples returns the list of expected samples, sorted by ref ID and timestamp.
 func (s seriesList) ExpectedSamples() []record.RefSample {
 	expect := []record.RefSample{}
 	for _, series := range s {

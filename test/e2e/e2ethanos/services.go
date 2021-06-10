@@ -13,8 +13,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/thanos-io/thanos/pkg/rules/remotewrite"
-
 	"github.com/cortexproject/cortex/integration/e2e"
 	"github.com/cortexproject/cortex/pkg/util"
 	"github.com/pkg/errors"
@@ -28,6 +26,7 @@ import (
 	"github.com/thanos-io/thanos/pkg/query"
 	"github.com/thanos-io/thanos/pkg/queryfrontend"
 	"github.com/thanos-io/thanos/pkg/receive"
+	"github.com/thanos-io/thanos/pkg/rules/remotewrite"
 )
 
 const infoLogLevel = "info"

@@ -15,12 +15,10 @@ import (
 	"testing"
 	"time"
 
-	common_cfg "github.com/prometheus/common/config"
-	"github.com/prometheus/prometheus/config"
-	"github.com/thanos-io/thanos/pkg/rules/remotewrite"
-
 	"github.com/cortexproject/cortex/integration/e2e"
+	common_cfg "github.com/prometheus/common/config"
 	"github.com/prometheus/common/model"
+	"github.com/prometheus/prometheus/config"
 	"github.com/prometheus/prometheus/discovery/targetgroup"
 	"gopkg.in/yaml.v2"
 
@@ -28,6 +26,7 @@ import (
 	http_util "github.com/thanos-io/thanos/pkg/http"
 	"github.com/thanos-io/thanos/pkg/promclient"
 	"github.com/thanos-io/thanos/pkg/query"
+	"github.com/thanos-io/thanos/pkg/rules/remotewrite"
 	"github.com/thanos-io/thanos/pkg/rules/rulespb"
 	"github.com/thanos-io/thanos/pkg/testutil"
 	"github.com/thanos-io/thanos/test/e2e/e2ethanos"
