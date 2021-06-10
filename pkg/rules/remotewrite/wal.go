@@ -1,5 +1,6 @@
 // This is copied from https://github.com/grafana/agent/blob/a23bd5cf27c2ac99695b7449d38fb12444941a1c/pkg/prom/wal/wal.go
 // TODO(idoqo): Migrate to prometheus package when https://github.com/prometheus/prometheus/pull/8785 is ready.
+
 package remotewrite
 
 import (
@@ -13,6 +14,7 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/prometheus/pkg/exemplar"
 	"github.com/prometheus/prometheus/pkg/labels"
 	"github.com/prometheus/prometheus/pkg/timestamp"
@@ -39,40 +41,30 @@ type storageMetrics struct {
 
 func newStorageMetrics(r prometheus.Registerer) *storageMetrics {
 	m := storageMetrics{r: r}
-	m.numActiveSeries = prometheus.NewGauge(prometheus.GaugeOpts{
+	m.numActiveSeries = promauto.With(r).NewGauge(prometheus.GaugeOpts{
 		Name: "agent_wal_storage_active_series",
 		Help: "Current number of active series being tracked by the WAL storage",
 	})
 
-	m.numDeletedSeries = prometheus.NewGauge(prometheus.GaugeOpts{
+	m.numDeletedSeries = promauto.With(r).NewGauge(prometheus.GaugeOpts{
 		Name: "agent_wal_storage_deleted_series",
 		Help: "Current number of series marked for deletion from memory",
 	})
 
-	m.totalCreatedSeries = prometheus.NewCounter(prometheus.CounterOpts{
+	m.totalCreatedSeries = promauto.With(r).NewCounter(prometheus.CounterOpts{
 		Name: "agent_wal_storage_created_series_total",
 		Help: "Total number of created series appended to the WAL",
 	})
 
-	m.totalRemovedSeries = prometheus.NewCounter(prometheus.CounterOpts{
+	m.totalRemovedSeries = promauto.With(r).NewCounter(prometheus.CounterOpts{
 		Name: "agent_wal_storage_removed_series_total",
 		Help: "Total number of created series removed from the WAL",
 	})
 
-	m.totalAppendedSamples = prometheus.NewCounter(prometheus.CounterOpts{
+	m.totalAppendedSamples = promauto.With(r).NewCounter(prometheus.CounterOpts{
 		Name: "agent_wal_samples_appended_total",
 		Help: "Total number of samples appended to the WAL",
 	})
-
-	if r != nil {
-		r.MustRegister(
-			m.numActiveSeries,
-			m.numDeletedSeries,
-			m.totalCreatedSeries,
-			m.totalRemovedSeries,
-			m.totalAppendedSamples,
-		)
-	}
 
 	return &m
 }
