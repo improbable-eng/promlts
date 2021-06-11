@@ -8,6 +8,7 @@ require (
 	github.com/NYTimes/gziphandler v1.1.1
 	github.com/alecthomas/units v0.0.0-20210208195552-ff826a37aa15
 	github.com/aliyun/aliyun-oss-go-sdk v2.0.4+incompatible
+	github.com/asaskevich/govalidator v0.0.0-20210307081110-f21760c49a8d // indirect
 	github.com/blang/semver/v4 v4.0.0
 	github.com/bradfitz/gomemcache v0.0.0-20190913173617-a41fca850d0b
 	github.com/cespare/xxhash v1.1.0
@@ -16,11 +17,13 @@ require (
 	github.com/chromedp/chromedp v0.5.3
 	github.com/cortexproject/cortex v1.8.1-0.20210422151339-cf1c444e0905
 	github.com/davecgh/go-spew v1.1.1
+	github.com/efficientgo/tools/core v0.0.0-20210326193628-425a09c04e05 // indirect
 	github.com/facette/natsort v0.0.0-20181210072756-2cd4dd1e2dcb
 	github.com/fatih/structtag v1.1.0
 	github.com/felixge/fgprof v0.9.1
 	github.com/fsnotify/fsnotify v1.4.9
 	github.com/go-kit/kit v0.10.0
+	github.com/go-openapi/analysis v0.20.1 // indirect
 	github.com/go-openapi/strfmt v0.20.1
 	github.com/gogo/protobuf v1.3.2
 	github.com/gogo/status v1.0.3
@@ -35,6 +38,7 @@ require (
 	github.com/leanovate/gopter v0.2.4
 	github.com/lightstep/lightstep-tracer-go v0.18.1
 	github.com/lovoo/gcloud-opentracing v0.3.0
+	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/miekg/dns v1.1.41
 	github.com/minio/minio-go/v7 v7.0.10
 	github.com/mozillazg/go-cos v0.13.0
@@ -47,10 +51,11 @@ require (
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/pkg/errors v0.9.1
 	github.com/pmezard/go-difflib v1.0.0
-	github.com/prometheus/alertmanager v0.21.1-0.20210422101724-8176f78a70e1
+	github.com/prometheus-community/prom-label-proxy v0.3.1-0.20210517165938-08d3f300c682
+	github.com/prometheus/alertmanager v0.22.0-rc.1
 	github.com/prometheus/client_golang v1.10.0
 	github.com/prometheus/client_model v0.2.0
-	github.com/prometheus/common v0.23.0
+	github.com/prometheus/common v0.24.0
 	github.com/prometheus/exporter-toolkit v0.5.1
 	github.com/prometheus/prometheus v1.8.2-0.20210519120135-d95b0972505f
 	github.com/uber/jaeger-client-go v2.28.0+incompatible
@@ -58,12 +63,15 @@ require (
 	github.com/weaveworks/common v0.0.0-20210419092856-009d1eebd624
 	go.elastic.co/apm v1.11.0
 	go.elastic.co/apm/module/apmot v1.11.0
+	go.mongodb.org/mongo-driver v1.5.2 // indirect
 	go.uber.org/atomic v1.7.0
 	go.uber.org/automaxprocs v1.2.0
 	go.uber.org/goleak v1.1.10
 	golang.org/x/crypto v0.0.0-20210220033148-5ea612d1eb83
+	golang.org/x/net v0.0.0-20210510120150-4163338589ed // indirect
 	golang.org/x/oauth2 v0.0.0-20210427180440-81ed05c6b58c
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
+	golang.org/x/sys v0.0.0-20210514084401-e8d321eab015 // indirect
 	golang.org/x/text v0.3.6
 	google.golang.org/api v0.46.0
 	google.golang.org/genproto v0.0.0-20210429181445-86c259c2b4ab

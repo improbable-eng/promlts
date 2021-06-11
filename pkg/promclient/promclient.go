@@ -102,7 +102,7 @@ func NewWithTracingClient(logger log.Logger, userAgent string) *Client {
 
 // req2xx sends a request to the given url.URL. If method is http.MethodPost then
 // the raw query is encoded in the body and the appropriate Content-Type is set.
-func (c *Client) req2xx(ctx context.Context, u *url.URL, method string) (_ []byte, _ int, err error) {
+func (c *Client) req2xx(ctx context.Context, u *url.URL, method string, headers map[string]string) (_ []byte, _ int, err error) {
 	var b io.Reader
 	if method == http.MethodPost {
 		rq := u.RawQuery
@@ -120,7 +120,9 @@ func (c *Client) req2xx(ctx context.Context, u *url.URL, method string) (_ []byt
 	if method == http.MethodPost {
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	}
-
+	if _, ok := headers["tenantHeader"]; ok {
+		req.Header.Set("THANOS-TENANT", headers["tenantHeader"])
+	}
 	resp, err := c.Do(req.WithContext(ctx))
 	if err != nil {
 		return nil, 0, errors.Wrapf(err, "perform %s request against %s", method, u.String())
@@ -163,7 +165,7 @@ func (c *Client) ExternalLabels(ctx context.Context, base *url.URL) (labels.Labe
 	span, ctx := tracing.StartSpan(ctx, "/prom_config HTTP[client]")
 	defer span.Finish()
 
-	body, _, err := c.req2xx(ctx, &u, http.MethodGet)
+	body, _, err := c.req2xx(ctx, &u, http.MethodGet, map[string]string{})
 	if err != nil {
 		return nil, err
 	}
@@ -380,7 +382,7 @@ func (p *QueryOptions) AddTo(values url.Values) error {
 }
 
 // QueryInstant performs an instant query using a default HTTP client and returns results in model.Vector type.
-func (c *Client) QueryInstant(ctx context.Context, base *url.URL, query string, t time.Time, opts QueryOptions) (model.Vector, []string, error) {
+func (c *Client) QueryInstant(ctx context.Context, base *url.URL, query string, t time.Time, opts QueryOptions, tenantAccess string) (model.Vector, []string, error) {
 	params, err := url.ParseQuery(base.RawQuery)
 	if err != nil {
 		return nil, nil, errors.Wrapf(err, "parse raw query %s", base.RawQuery)
@@ -405,7 +407,7 @@ func (c *Client) QueryInstant(ctx context.Context, base *url.URL, query string, 
 		method = http.MethodGet
 	}
 
-	body, _, err := c.req2xx(ctx, &u, method)
+	body, _, err := c.req2xx(ctx, &u, method, map[string]string{"tenantHeader": tenantAccess})
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "read query instant response")
 	}
@@ -457,7 +459,7 @@ func (c *Client) QueryInstant(ctx context.Context, base *url.URL, query string, 
 
 // PromqlQueryInstant performs instant query and returns results in promql.Vector type that is compatible with promql package.
 func (c *Client) PromqlQueryInstant(ctx context.Context, base *url.URL, query string, t time.Time, opts QueryOptions) (promql.Vector, []string, error) {
-	vectorResult, warnings, err := c.QueryInstant(ctx, base, query, t, opts)
+	vectorResult, warnings, err := c.QueryInstant(ctx, base, query, t, opts, "")
 	if err != nil {
 		return nil, nil, err
 	}
@@ -507,7 +509,7 @@ func (c *Client) QueryRange(ctx context.Context, base *url.URL, query string, st
 	span, ctx := tracing.StartSpan(ctx, "/prom_query_range HTTP[client]")
 	defer span.Finish()
 
-	body, _, err := c.req2xx(ctx, &u, http.MethodGet)
+	body, _, err := c.req2xx(ctx, &u, http.MethodGet, map[string]string{})
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "read query range response")
 	}
@@ -589,7 +591,7 @@ func (c *Client) AlertmanagerAlerts(ctx context.Context, base *url.URL) ([]*mode
 	span, ctx := tracing.StartSpan(ctx, "/alertmanager_alerts HTTP[client]")
 	defer span.Finish()
 
-	body, _, err := c.req2xx(ctx, &u, http.MethodGet)
+	body, _, err := c.req2xx(ctx, &u, http.MethodGet, map[string]string{})
 	if err != nil {
 		return nil, err
 	}
@@ -620,7 +622,7 @@ func (c *Client) BuildVersion(ctx context.Context, base *url.URL) (string, error
 	defer span.Finish()
 
 	// We get status code 404 for prometheus versions lower than 2.14.0
-	body, code, err := c.req2xx(ctx, &u, http.MethodGet)
+	body, code, err := c.req2xx(ctx, &u, http.MethodGet, map[string]string{})
 	if err != nil {
 		if code == http.StatusNotFound {
 			return "0", nil
@@ -649,7 +651,7 @@ func (c *Client) get2xxResultWithGRPCErrors(ctx context.Context, spanName string
 	span, ctx := tracing.StartSpan(ctx, spanName)
 	defer span.Finish()
 
-	body, code, err := c.req2xx(ctx, u, http.MethodGet)
+	body, code, err := c.req2xx(ctx, u, http.MethodGet, map[string]string{})
 	if err != nil {
 		if code, exists := statusToCode[code]; exists && code != 0 {
 			return status.Error(code, err.Error())

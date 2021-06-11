@@ -52,6 +52,13 @@ import (
 	"github.com/thanos-io/thanos/pkg/ui"
 )
 
+const (
+	// DefaultTenantHeader is the default header used to determine tenant access for a query.
+	DefaultTenantHeader = "THANOS-TENANT"
+	// DefaultTenantLabel is the default tenant-label name in query.
+	DefaultTenantLabel = "tenant_id"
+)
+
 // registerQuery registers a query command.
 func registerQuery(app *extkingpin.App) {
 	comp := component.Query
@@ -145,6 +152,10 @@ func registerQuery(app *extkingpin.App) {
 
 	enableMetricMetadataPartialResponse := cmd.Flag("metric-metadata.partial-response", "Enable partial response for metric metadata endpoint. --no-metric-metadata.partial-response for disabling.").
 		Hidden().Default("true").Bool()
+
+	tenantHeader := cmd.Flag("query.tenant-header", "HTTP header to determine tenant access for a query.").Default(DefaultTenantHeader).String()
+
+	tenantLabelName := cmd.Flag("query.tenant-label-name", "Tenant label name in query.").Default(DefaultTenantLabel).String()
 
 	defaultEvaluationInterval := extkingpin.ModelDuration(cmd.Flag("query.default-evaluation-interval", "Set default evaluation interval for sub queries.").Default("1m"))
 
@@ -259,6 +270,8 @@ func registerQuery(app *extkingpin.App) {
 			time.Duration(*unhealthyStoreTimeout),
 			time.Duration(*instantDefaultMaxSourceResolution),
 			*defaultMetadataTimeRange,
+			*tenantHeader,
+			*tenantLabelName,
 			*strictStores,
 			*webDisableCORS,
 			component.Query,
@@ -320,6 +333,8 @@ func runQuery(
 	unhealthyStoreTimeout time.Duration,
 	instantDefaultMaxSourceResolution time.Duration,
 	defaultMetadataTimeRange time.Duration,
+	tenantHeader string,
+	tenantLabelName string,
 	strictStores []string,
 	disableCORS bool,
 	comp component.Component,
@@ -582,6 +597,8 @@ func runQuery(
 			defaultRangeQueryStep,
 			instantDefaultMaxSourceResolution,
 			defaultMetadataTimeRange,
+			tenantHeader,
+			tenantLabelName,
 			disableCORS,
 			gate.New(
 				extprom.WrapRegistererWithPrefix("thanos_query_concurrent_", reg),

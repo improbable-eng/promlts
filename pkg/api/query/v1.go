@@ -100,6 +100,9 @@ type QueryAPI struct {
 	defaultInstantQueryMaxSourceResolution time.Duration
 	defaultMetadataTimeRange               time.Duration
 
+	tenantHeader    string
+	tenantLabelName string
+
 	queryRangeHist prometheus.Histogram
 }
 
@@ -123,6 +126,8 @@ func NewQueryAPI(
 	defaultRangeQueryStep time.Duration,
 	defaultInstantQueryMaxSourceResolution time.Duration,
 	defaultMetadataTimeRange time.Duration,
+	tenantHeader string,
+	tenantLabelName string,
 	disableCORS bool,
 	gate gate.Gate,
 	reg *prometheus.Registry,
@@ -148,6 +153,8 @@ func NewQueryAPI(
 		defaultRangeQueryStep:                  defaultRangeQueryStep,
 		defaultInstantQueryMaxSourceResolution: defaultInstantQueryMaxSourceResolution,
 		defaultMetadataTimeRange:               defaultMetadataTimeRange,
+		tenantHeader:                           tenantHeader,
+		tenantLabelName:                        tenantLabelName,
 		disableCORS:                            disableCORS,
 
 		queryRangeHist: promauto.With(reg).NewHistogram(prometheus.HistogramOpts{
@@ -339,7 +346,11 @@ func (qapi *QueryAPI) query(r *http.Request) (interface{}, []error, *api.ApiErro
 	span, ctx := tracing.StartSpan(ctx, "promql_instant_query")
 	defer span.Finish()
 
-	qry, err := qe.NewInstantQuery(qapi.queryableCreate(enableDedup, replicaLabels, storeDebugMatchers, maxSourceResolution, enablePartialResponse, false), r.FormValue("query"), ts)
+	tenant := query.TenantInfo{
+		Access:    r.Header.Get(qapi.tenantHeader),
+		LabelName: qapi.tenantLabelName,
+	}
+	qry, err := qe.NewInstantQuery(qapi.queryableCreate(enableDedup, replicaLabels, storeDebugMatchers, maxSourceResolution, enablePartialResponse, false, &tenant), r.FormValue("query"), ts)
 	if err != nil {
 		return nil, nil, &api.ApiError{Typ: api.ErrorBadData, Err: err}
 	}
@@ -455,8 +466,12 @@ func (qapi *QueryAPI) queryRange(r *http.Request) (interface{}, []error, *api.Ap
 	span, ctx := tracing.StartSpan(ctx, "promql_range_query")
 	defer span.Finish()
 
+	tenant := query.TenantInfo{
+		Access:    r.Header.Get(qapi.tenantHeader),
+		LabelName: qapi.tenantLabelName,
+	}
 	qry, err := qe.NewRangeQuery(
-		qapi.queryableCreate(enableDedup, replicaLabels, storeDebugMatchers, maxSourceResolution, enablePartialResponse, false),
+		qapi.queryableCreate(enableDedup, replicaLabels, storeDebugMatchers, maxSourceResolution, enablePartialResponse, false, &tenant),
 		r.FormValue("query"),
 		start,
 		end,
@@ -529,7 +544,11 @@ func (qapi *QueryAPI) labelValues(r *http.Request) (interface{}, []error, *api.A
 		matcherSets = append(matcherSets, matchers)
 	}
 
-	q, err := qapi.queryableCreate(true, nil, storeDebugMatchers, 0, enablePartialResponse, true).
+	tenant := query.TenantInfo{
+		Access:    r.Header.Get(qapi.tenantHeader),
+		LabelName: qapi.tenantLabelName,
+	}
+	q, err := qapi.queryableCreate(true, nil, storeDebugMatchers, 0, enablePartialResponse, true, &tenant).
 		Querier(ctx, timestamp.FromTime(start), timestamp.FromTime(end))
 	if err != nil {
 		return nil, nil, &api.ApiError{Typ: api.ErrorExec, Err: err}
@@ -616,7 +635,11 @@ func (qapi *QueryAPI) series(r *http.Request) (interface{}, []error, *api.ApiErr
 		return nil, nil, apiErr
 	}
 
-	q, err := qapi.queryableCreate(enableDedup, replicaLabels, storeDebugMatchers, math.MaxInt64, enablePartialResponse, true).
+	tenant := query.TenantInfo{
+		Access:    r.Header.Get(qapi.tenantHeader),
+		LabelName: qapi.tenantLabelName,
+	}
+	q, err := qapi.queryableCreate(enableDedup, replicaLabels, storeDebugMatchers, math.MaxInt64, enablePartialResponse, true, &tenant).
 		Querier(r.Context(), timestamp.FromTime(start), timestamp.FromTime(end))
 	if err != nil {
 		return nil, nil, &api.ApiError{Typ: api.ErrorExec, Err: err}
@@ -666,7 +689,11 @@ func (qapi *QueryAPI) labelNames(r *http.Request) (interface{}, []error, *api.Ap
 		matcherSets = append(matcherSets, matchers)
 	}
 
-	q, err := qapi.queryableCreate(true, nil, storeDebugMatchers, 0, enablePartialResponse, true).
+	tenant := query.TenantInfo{
+		Access:    r.Header.Get(qapi.tenantHeader),
+		LabelName: qapi.tenantLabelName,
+	}
+	q, err := qapi.queryableCreate(true, nil, storeDebugMatchers, 0, enablePartialResponse, true, &tenant).
 		Querier(r.Context(), timestamp.FromTime(start), timestamp.FromTime(end))
 	if err != nil {
 		return nil, nil, &api.ApiError{Typ: api.ErrorExec, Err: err}

@@ -384,6 +384,11 @@ Flags:
                                  able to query without deduplication using
                                  'dedup=false' parameter. Data includes time
                                  series, recording rules, and alerting rules.
+      --query.tenant-header="THANOS-TENANT"
+                                 HTTP header to determine tenant access for a
+                                 query.
+      --query.tenant-label-name="tenant_id"
+                                 Tenant label name in query.
       --query.timeout=2m         Maximum time to process query by query node.
       --request.logging-config=<content>
                                  Alternative to 'request.logging-config-file'

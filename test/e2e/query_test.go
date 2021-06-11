@@ -379,7 +379,7 @@ func mustURLParse(t *testing.T, addr string) *url.URL {
 	return u
 }
 
-func instantQuery(t *testing.T, ctx context.Context, addr string, q string, opts promclient.QueryOptions, expectedSeriesLen int) model.Vector {
+func instantQuery(t *testing.T, ctx context.Context, addr string, q string, opts promclient.QueryOptions, expectedSeriesLen int, tenantAccess string) model.Vector {
 	t.Helper()
 
 	fmt.Println("queryAndAssert: Waiting for", expectedSeriesLen, "results for query", q)
@@ -388,7 +388,7 @@ func instantQuery(t *testing.T, ctx context.Context, addr string, q string, opts
 	logger := log.NewLogfmtLogger(os.Stdout)
 	logger = log.With(logger, "ts", log.DefaultTimestampUTC)
 	testutil.Ok(t, runutil.RetryWithLog(logger, time.Second, ctx.Done(), func() error {
-		res, warnings, err := promclient.NewDefaultClient().QueryInstant(ctx, mustURLParse(t, "http://"+addr), q, time.Now(), opts)
+		res, warnings, err := promclient.NewDefaultClient().QueryInstant(ctx, mustURLParse(t, "http://"+addr), q, time.Now(), opts, tenantAccess)
 		if err != nil {
 			return err
 		}
@@ -410,7 +410,16 @@ func instantQuery(t *testing.T, ctx context.Context, addr string, q string, opts
 func queryAndAssertSeries(t *testing.T, ctx context.Context, addr string, q string, opts promclient.QueryOptions, expected []model.Metric) {
 	t.Helper()
 
-	result := instantQuery(t, ctx, addr, q, opts, len(expected))
+	result := instantQuery(t, ctx, addr, q, opts, len(expected), "")
+	for i, exp := range expected {
+		testutil.Equals(t, exp, result[i].Metric)
+	}
+}
+
+func queryAndAssertTenantSeries(t *testing.T, ctx context.Context, addr string, q string, opts promclient.QueryOptions, expected []model.Metric, tenantAccess string) {
+	t.Helper()
+
+	result := instantQuery(t, ctx, addr, q, opts, len(expected), tenantAccess)
 	for i, exp := range expected {
 		testutil.Equals(t, exp, result[i].Metric)
 	}
@@ -420,7 +429,7 @@ func queryAndAssert(t *testing.T, ctx context.Context, addr string, q string, op
 	t.Helper()
 
 	sortResults(expected)
-	result := instantQuery(t, ctx, addr, q, opts, len(expected))
+	result := instantQuery(t, ctx, addr, q, opts, len(expected), "")
 	for _, r := range result {
 		r.Timestamp = 0 // Does not matter for us.
 	}
@@ -524,4 +533,60 @@ func queryExemplars(t *testing.T, ctx context.Context, addr string, q string, st
 
 		return errors.Errorf("unexpected results size %d", len(res))
 	}))
+}
+
+func TestQueryMultiTenancy(t *testing.T) {
+	t.Parallel()
+
+	s, err := e2e.NewScenario("e2e_test_query_multitenancy")
+	testutil.Ok(t, err)
+	t.Cleanup(e2ethanos.CleanScenario(t, s))
+
+	receiver1, err := e2ethanos.NewReceiver(s.SharedDir(), s.NetworkName(), "1", 0)
+	testutil.Ok(t, err)
+	receiver2, err := e2ethanos.NewReceiver(s.SharedDir(), s.NetworkName(), "2", 0)
+	testutil.Ok(t, err)
+
+	testutil.Ok(t, s.StartAndWaitReady(receiver1, receiver2))
+
+	conf1 := ReverseProxyConfig{
+		tenantId: "tenant-a",
+		port:     ":10002",
+		target:   "http://" + receiver1.Endpoint(8081),
+	}
+
+	conf2 := ReverseProxyConfig{
+		tenantId: "tenant-b",
+		port:     ":10003",
+		target:   "http://" + receiver2.Endpoint(8081),
+	}
+
+	go generateProxy(conf1)
+	go generateProxy(conf2)
+
+	prom1, _, err := e2ethanos.NewPrometheus(s.SharedDir(), "1", defaultPromConfig("prom1", 0, "http://172.17.0.1:10002/api/v1/receive", ""), e2ethanos.DefaultPrometheusImage())
+	testutil.Ok(t, err)
+	prom2, _, err := e2ethanos.NewPrometheus(s.SharedDir(), "2", defaultPromConfig("prom2", 0, "http://172.17.0.1:10003/api/v1/receive", ""), e2ethanos.DefaultPrometheusImage())
+	testutil.Ok(t, err)
+	testutil.Ok(t, s.StartAndWaitReady(prom1, prom2))
+
+	q, err := e2ethanos.NewQuerierBuilder(s.SharedDir(), "1", []string{receiver1.GRPCNetworkEndpoint(), receiver2.GRPCNetworkEndpoint()}).Build()
+	testutil.Ok(t, err)
+	testutil.Ok(t, s.StartAndWaitReady(q))
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	t.Cleanup(cancel)
+
+	// Query to tenant-a and tenant-b data is scoped down according to tenant access specified in header(tenant-a in this case).
+	queryAndAssertTenantSeries(t, ctx, q.HTTPEndpoint(), "sum(up{tenant_id=~\"tenant-a | tenant-b\"}) without (instance)", promclient.QueryOptions{
+		Deduplicate: false,
+	}, []model.Metric{
+		{
+			"job":        "myself",
+			"prometheus": "prom1",
+			"receive":    "1",
+			"replica":    "0",
+			"tenant_id":  "tenant-a",
+		},
+	}, "tenant-a")
 }
