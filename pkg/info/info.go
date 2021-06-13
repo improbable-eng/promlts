@@ -51,7 +51,7 @@ func RegisterInfoServer(infoSrv infopb.InfoServer) func(*grpc.Server) {
 	}
 }
 
-func (srv *InfoServer) Info(ctx context.Context, req *infopb.InfoRequest) (*infopb.InfoResponse, error) {
+func (srv *InfoServer) Info(ctx context.Context, req *infopb.InfoReq) (*infopb.InfoResp, error) {
 
 	if srv.getStoreInfo == nil {
 		srv.getStoreInfo = func() *infopb.StoreInfo { return nil }
@@ -73,7 +73,7 @@ func (srv *InfoServer) Info(ctx context.Context, req *infopb.InfoRequest) (*info
 		srv.getMetricMetadataInfo = func() *infopb.MetricMetadataInfo { return nil }
 	}
 
-	resp := &infopb.InfoResponse{
+	resp := &infopb.InfoResp{
 		LabelSets:      srv.getLabelSet(),
 		ComponentType:  srv.component,
 		Store:          srv.getStoreInfo(),

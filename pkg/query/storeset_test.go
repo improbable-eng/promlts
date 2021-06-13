@@ -132,10 +132,10 @@ func (s *testStores) CloseOne(addr string) {
 }
 
 type mockedInfo struct {
-	info infopb.InfoResponse
+	info infopb.InfoResp
 }
 
-func (s *mockedInfo) Info(ctx context.Context, r *infopb.InfoRequest) (*infopb.InfoResponse, error) {
+func (s *mockedInfo) Info(ctx context.Context, r *infopb.InfoReq) (*infopb.InfoResp, error) {
 	return &s.info, nil
 }
 
@@ -170,7 +170,7 @@ func startInfoSrvs(infoMetas []testInfoMeta) (*testInfoSrvs, error) {
 		srv := grpc.NewServer()
 
 		infoSrv := &mockedInfo{
-			info: infopb.InfoResponse{
+			info: infopb.InfoResp{
 				LabelSets:      meta.extlsetFn(listener.Addr().String()),
 				Store:          &meta.store,
 				MetricMetadata: &meta.metadata,
