@@ -25,7 +25,7 @@ We use _breaking :warning:_ to mark changes that are not backward compatible (re
 
 ### Changed
 
--
+- [#4290](https://github.com/thanos-io/thanos/pull/4290) proxy: coalesce multiple requests for the same data; greatly improves performance when opening a dashboard without query-frontend where there are a lot of different panels (queries) asking for the same data
 
 ## [v0.21.1](https://github.com/thanos-io/thanos/releases/tag/v0.21.1) - 2021.06.04
 
