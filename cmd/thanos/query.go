@@ -96,6 +96,9 @@ func registerQuery(app *extkingpin.App) {
 	selectorLabels := cmd.Flag("selector-label", "Query selector labels that will be exposed in info endpoint (repeated).").
 		PlaceHolder("<name>=\"<value>\"").Strings()
 
+	endpoints := cmd.Flag("endpoint", "Addresses of statically configured Thanos API servers (repeatable). The scheme may be prefixed with 'dns+' or 'dnssrv+' to detect Thanos API servers through respective DNS lookups.").
+		PlaceHolder("<endpoint>").Strings()
+
 	stores := cmd.Flag("store", "Addresses of statically configured store API servers (repeatable). The scheme may be prefixed with 'dns+' or 'dnssrv+' to detect store API servers through respective DNS lookups.").
 		PlaceHolder("<store>").Strings()
 
@@ -243,6 +246,7 @@ func registerQuery(app *extkingpin.App) {
 			*queryReplicaLabels,
 			selectorLset,
 			getFlagsMap(cmd.Flags()),
+			*endpoints,
 			*stores,
 			*ruleEndpoints,
 			*targetEndpoints,
@@ -304,6 +308,7 @@ func runQuery(
 	queryReplicaLabels []string,
 	selectorLset labels.Labels,
 	flagsMap map[string]string,
+	endpoints []string,
 	storeAddrs []string,
 	ruleAddrs []string,
 	targetAddrs []string,
@@ -347,6 +352,12 @@ func runQuery(
 			return errors.Errorf("%s is a dynamically specified store i.e. it uses SD and that is not permitted under strict mode. Use --store for this", store)
 		}
 	}
+
+	dnsInfoProvider := dns.NewProvider(
+		logger,
+		extprom.WrapRegistererWithPrefix("thanos_query_info_apis_", reg),
+		dns.ResolverType(dnsSDResolver),
+	)
 
 	dnsRuleProvider := dns.NewProvider(
 		logger,
@@ -414,6 +425,13 @@ func runQuery(
 			},
 			func() (specs []query.ExemplarSpec) {
 				for _, addr := range dnsExemplarProvider.Addresses() {
+					specs = append(specs, query.NewGRPCStoreSpec(addr, false))
+				}
+
+				return specs
+			},
+			func() (specs []query.InfoSpec) {
+				for _, addr := range dnsInfoProvider.Addresses() {
 					specs = append(specs, query.NewGRPCStoreSpec(addr, false))
 				}
 
@@ -521,6 +539,10 @@ func runQuery(
 				}
 				if err := dnsExemplarProvider.Resolve(resolveCtx, exemplarAddrs); err != nil {
 					level.Error(logger).Log("msg", "failed to resolve addresses for exemplarsAPI", "err", err)
+				}
+				if err := dnsInfoProvider.Resolve(resolveCtx, endpoints); err != nil {
+					level.Error(logger).Log("msg", "failed to resolve addresses  passed using endpoint flag", "err", err)
+
 				}
 				return nil
 			})

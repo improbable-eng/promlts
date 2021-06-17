@@ -18,6 +18,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/thanos-io/thanos/pkg/component"
+	"github.com/thanos-io/thanos/pkg/info/infopb"
 	"github.com/thanos-io/thanos/pkg/store"
 	"github.com/thanos-io/thanos/pkg/store/labelpb"
 	"github.com/thanos-io/thanos/pkg/store/storepb"
@@ -130,6 +131,93 @@ func (s *testStores) CloseOne(addr string) {
 	delete(s.srvs, addr)
 }
 
+type mockedInfo struct {
+	info infopb.InfoResp
+}
+
+func (s *mockedInfo) Info(ctx context.Context, r *infopb.InfoReq) (*infopb.InfoResp, error) {
+	return &s.info, nil
+}
+
+type testInfoMeta struct {
+	extlsetFn func(add string) []labelpb.ZLabelSet
+	storeType component.StoreAPI
+	store     infopb.StoreInfo
+	rule      infopb.RulesInfo
+	metadata  infopb.MetricMetadataInfo
+	target    infopb.TargetsInfo
+	exemplar  infopb.ExemplarsInfo
+}
+
+type testInfoSrvs struct {
+	srvs       map[string]*grpc.Server
+	orderAddrs []string
+}
+
+func startInfoSrvs(infoMetas []testInfoMeta) (*testInfoSrvs, error) {
+	info := &testInfoSrvs{
+		srvs: map[string]*grpc.Server{},
+	}
+
+	for _, meta := range infoMetas {
+		listener, err := net.Listen("tcp", "127.0.0.1:0")
+		if err != nil {
+			// Close the servers
+			info.Close()
+			return nil, err
+		}
+
+		srv := grpc.NewServer()
+
+		infoSrv := &mockedInfo{
+			info: infopb.InfoResp{
+				LabelSets:      meta.extlsetFn(listener.Addr().String()),
+				Store:          &meta.store,
+				MetricMetadata: &meta.metadata,
+				Rules:          &meta.rule,
+				Targets:        &meta.target,
+				Exemplars:      &meta.exemplar,
+			},
+		}
+
+		if meta.storeType != nil {
+			infoSrv.info.ComponentType = meta.storeType.String()
+		}
+		infopb.RegisterInfoServer(srv, infoSrv)
+		go func() {
+			_ = srv.Serve(listener)
+		}()
+
+		info.srvs[listener.Addr().String()] = srv
+		info.orderAddrs = append(info.orderAddrs, listener.Addr().String())
+	}
+
+	return info, nil
+}
+
+func (s *testInfoSrvs) Close() {
+	for _, srv := range s.srvs {
+		srv.Stop()
+	}
+	s.srvs = nil
+}
+
+func (s *testInfoSrvs) CloseOne(addr string) {
+	srv, ok := s.srvs[addr]
+	if !ok {
+		return
+	}
+
+	srv.Stop()
+	delete(s.srvs, addr)
+}
+
+func (s *testInfoSrvs) InfoAddresses() []string {
+	var stores []string
+	stores = append(stores, s.orderAddrs...)
+	return stores
+}
+
 func TestStoreSet_Update(t *testing.T) {
 	stores, err := startTestStores([]testStoreMeta{
 		{
@@ -184,8 +272,95 @@ func TestStoreSet_Update(t *testing.T) {
 
 	discoveredStoreAddr := stores.StoreAddresses()
 
+	infoSrvs, err := startInfoSrvs([]testInfoMeta{
+		{
+			storeType: component.Sidecar,
+			extlsetFn: func(addr string) []labelpb.ZLabelSet {
+				return []labelpb.ZLabelSet{
+					{
+						Labels: []labelpb.ZLabel{
+							{Name: "addr", Value: addr},
+						},
+					},
+					{
+						Labels: []labelpb.ZLabel{
+							{Name: "a", Value: "b"},
+						},
+					},
+				}
+			},
+			store: infopb.StoreInfo{
+				MinTime: math.MaxInt64,
+				MaxTime: math.MinInt64,
+			},
+			exemplar: infopb.ExemplarsInfo{
+				MinTime: math.MaxInt64,
+				MaxTime: math.MinInt64,
+			},
+			rule:     infopb.RulesInfo{},
+			metadata: infopb.MetricMetadataInfo{},
+			target:   infopb.TargetsInfo{},
+		},
+		{
+			storeType: component.Sidecar,
+			extlsetFn: func(addr string) []labelpb.ZLabelSet {
+				return []labelpb.ZLabelSet{
+					{
+						Labels: []labelpb.ZLabel{
+							{Name: "addr", Value: addr},
+						},
+					},
+					{
+						Labels: []labelpb.ZLabel{
+							{Name: "a", Value: "b"},
+						},
+					},
+				}
+			},
+			store: infopb.StoreInfo{
+				MinTime: math.MaxInt64,
+				MaxTime: math.MinInt64,
+			},
+			exemplar: infopb.ExemplarsInfo{
+				MinTime: math.MaxInt64,
+				MaxTime: math.MinInt64,
+			},
+			rule:     infopb.RulesInfo{},
+			metadata: infopb.MetricMetadataInfo{},
+			target:   infopb.TargetsInfo{},
+		},
+		{
+			storeType: component.Query,
+			extlsetFn: func(addr string) []labelpb.ZLabelSet {
+				return []labelpb.ZLabelSet{
+					{
+						Labels: []labelpb.ZLabel{
+							{Name: "addr", Value: "broken"},
+						},
+					},
+				}
+			},
+			store: infopb.StoreInfo{
+				MinTime: math.MaxInt64,
+				MaxTime: math.MinInt64,
+			},
+			exemplar: infopb.ExemplarsInfo{
+				MinTime: math.MaxInt64,
+				MaxTime: math.MinInt64,
+			},
+			rule:     infopb.RulesInfo{},
+			metadata: infopb.MetricMetadataInfo{},
+			target:   infopb.TargetsInfo{},
+		},
+	})
+	testutil.Ok(t, err)
+	defer infoSrvs.Close()
+
+	discoveredInfoAddr := infoSrvs.InfoAddresses()
+
 	// Testing if duplicates can cause weird results.
 	discoveredStoreAddr = append(discoveredStoreAddr, discoveredStoreAddr[0])
+	discoveredInfoAddr = append(discoveredInfoAddr, discoveredInfoAddr[0])
 	storeSet := NewStoreSet(nil, nil,
 		func() (specs []StoreSpec) {
 			for _, addr := range discoveredStoreAddr {
@@ -205,6 +380,12 @@ func TestStoreSet_Update(t *testing.T) {
 		func() (specs []ExemplarSpec) {
 			return nil
 		},
+		func() (specs []InfoSpec) {
+			for _, addr := range discoveredInfoAddr {
+				specs = append(specs, NewGRPCStoreSpec(addr, false))
+			}
+			return specs
+		},
 		testGRPCOpts, time.Minute)
 	storeSet.gRPCInfoCallTimeout = 2 * time.Second
 	defer storeSet.Close()
@@ -215,11 +396,14 @@ func TestStoreSet_Update(t *testing.T) {
 	// Start with one not available.
 	stores.CloseOne(discoveredStoreAddr[2])
 
+	// Make one address discovered by Info Servers unavailable.
+	infoSrvs.CloseOne(discoveredInfoAddr[2])
+
 	// Should not matter how many of these we run.
 	storeSet.Update(context.Background())
 	storeSet.Update(context.Background())
-	testutil.Equals(t, 2, len(storeSet.stores))
-	testutil.Equals(t, 3, len(storeSet.storeStatuses))
+	testutil.Equals(t, 4, len(storeSet.stores))
+	testutil.Equals(t, 6, len(storeSet.storeStatuses))
 
 	for addr, st := range storeSet.stores {
 		testutil.Equals(t, addr, st.addr)
@@ -237,22 +421,28 @@ func TestStoreSet_Update(t *testing.T) {
 	expected[component.Sidecar] = map[string]int{
 		fmt.Sprintf("{a=\"b\"},{addr=\"%s\"}", discoveredStoreAddr[0]): 1,
 		fmt.Sprintf("{a=\"b\"},{addr=\"%s\"}", discoveredStoreAddr[1]): 1,
+		fmt.Sprintf("{a=\"b\"},{addr=\"%s\"}", discoveredInfoAddr[0]):  1,
+		fmt.Sprintf("{a=\"b\"},{addr=\"%s\"}", discoveredInfoAddr[1]):  1,
 	}
 	testutil.Equals(t, expected, storeSet.storesMetric.storeNodes)
 
 	// Remove address from discovered and reset last check, which should ensure cleanup of status on next update.
 	storeSet.storeStatuses[discoveredStoreAddr[2]].LastCheck = time.Now().Add(-4 * time.Minute)
 	discoveredStoreAddr = discoveredStoreAddr[:len(discoveredStoreAddr)-2]
+	storeSet.storeStatuses[discoveredInfoAddr[2]].LastCheck = time.Now().Add(-4 * time.Minute)
+	discoveredInfoAddr = discoveredInfoAddr[:len(discoveredInfoAddr)-2]
 	storeSet.Update(context.Background())
-	testutil.Equals(t, 2, len(storeSet.storeStatuses))
+	testutil.Equals(t, 4, len(storeSet.storeStatuses))
 
 	stores.CloseOne(discoveredStoreAddr[0])
 	delete(expected[component.Sidecar], fmt.Sprintf("{a=\"b\"},{addr=\"%s\"}", discoveredStoreAddr[0]))
+	infoSrvs.CloseOne(discoveredInfoAddr[0])
+	delete(expected[component.Sidecar], fmt.Sprintf("{a=\"b\"},{addr=\"%s\"}", discoveredInfoAddr[0]))
 
 	// We expect Update to tear down store client for closed store server.
 	storeSet.Update(context.Background())
-	testutil.Equals(t, 1, len(storeSet.stores), "only one service should respond just fine, so we expect one client to be ready.")
-	testutil.Equals(t, 2, len(storeSet.storeStatuses))
+	testutil.Equals(t, 2, len(storeSet.stores), "only two service should respond just fine, so we expect one client to be ready.")
+	testutil.Equals(t, 4, len(storeSet.storeStatuses))
 
 	addr := discoveredStoreAddr[1]
 	st, ok := storeSet.stores[addr]
@@ -478,7 +668,7 @@ func TestStoreSet_Update(t *testing.T) {
 
 	// New stores should be loaded.
 	storeSet.Update(context.Background())
-	testutil.Equals(t, 1+len(stores2.srvs), len(storeSet.stores))
+	testutil.Equals(t, 2+len(stores2.srvs), len(storeSet.stores))
 
 	// Check stats.
 	expected = newStoreAPIStats()
@@ -494,6 +684,7 @@ func TestStoreSet_Update(t *testing.T) {
 	}
 	expected[component.Sidecar] = map[string]int{
 		fmt.Sprintf("{a=\"b\"},{addr=\"%s\"}", discoveredStoreAddr[1]): 1,
+		fmt.Sprintf("{a=\"b\"},{addr=\"%s\"}", discoveredInfoAddr[1]):  1,
 		"{l1=\"v2\", l2=\"v3\"}": 2,
 	}
 	expected[component.Store] = map[string]int{
@@ -503,7 +694,7 @@ func TestStoreSet_Update(t *testing.T) {
 	testutil.Equals(t, expected, storeSet.storesMetric.storeNodes)
 
 	// Check statuses.
-	testutil.Equals(t, 2+len(stores2.srvs), len(storeSet.storeStatuses))
+	testutil.Equals(t, 4+len(stores2.srvs), len(storeSet.storeStatuses))
 }
 
 func TestStoreSet_Update_NoneAvailable(t *testing.T) {
@@ -542,9 +733,42 @@ func TestStoreSet_Update_NoneAvailable(t *testing.T) {
 	testutil.Ok(t, err)
 	defer st.Close()
 
+	infoSrvs, err := startInfoSrvs([]testInfoMeta{
+		{
+			storeType: component.Sidecar,
+			extlsetFn: func(addr string) []labelpb.ZLabelSet {
+				return []labelpb.ZLabelSet{
+					{
+						Labels: []labelpb.ZLabel{
+							{Name: "addr", Value: addr},
+						},
+					},
+				}
+			},
+		},
+		{
+			storeType: component.Sidecar,
+			extlsetFn: func(addr string) []labelpb.ZLabelSet {
+				return []labelpb.ZLabelSet{
+					{
+						Labels: []labelpb.ZLabel{
+							{Name: "addr", Value: addr},
+						},
+					},
+				}
+			},
+		},
+	})
+	testutil.Ok(t, err)
+	defer infoSrvs.Close()
+
 	initialStoreAddr := st.StoreAddresses()
 	st.CloseOne(initialStoreAddr[0])
 	st.CloseOne(initialStoreAddr[1])
+
+	initialInfoAddr := infoSrvs.InfoAddresses()
+	infoSrvs.CloseOne(initialInfoAddr[0])
+	infoSrvs.CloseOne(initialInfoAddr[1])
 
 	storeSet := NewStoreSet(nil, nil,
 		func() (specs []StoreSpec) {
@@ -557,6 +781,12 @@ func TestStoreSet_Update_NoneAvailable(t *testing.T) {
 		func() (specs []TargetSpec) { return nil },
 		func() (specs []MetadataSpec) { return nil },
 		func() (specs []ExemplarSpec) { return nil },
+		func() (specs []InfoSpec) {
+			for _, addr := range initialInfoAddr {
+				specs = append(specs, NewGRPCStoreSpec(addr, false))
+			}
+			return specs
+		},
 		testGRPCOpts, time.Minute)
 	storeSet.gRPCInfoCallTimeout = 2 * time.Second
 
@@ -647,6 +877,8 @@ func TestQuerierStrict(t *testing.T) {
 	}, func() (specs []MetadataSpec) {
 		return nil
 	}, func() []ExemplarSpec {
+		return nil
+	}, func() []InfoSpec {
 		return nil
 	}, testGRPCOpts, time.Minute)
 	defer storeSet.Close()
@@ -802,6 +1034,7 @@ func TestStoreSet_Update_Rules(t *testing.T) {
 			func() []TargetSpec { return nil },
 			func() []MetadataSpec { return nil },
 			tc.exemplarSpecs,
+			func() []InfoSpec { return nil },
 			testGRPCOpts, time.Minute)
 
 		t.Run(tc.name, func(t *testing.T) {
@@ -979,6 +1212,9 @@ func TestStoreSet_Rules_Discovery(t *testing.T) {
 					return nil
 				},
 				func() []ExemplarSpec { return nil },
+				func() []InfoSpec {
+					return nil
+				},
 				testGRPCOpts, time.Minute)
 
 			defer storeSet.Close()

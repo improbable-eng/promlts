@@ -18,6 +18,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/prometheus/pkg/labels"
 	"github.com/thanos-io/thanos/pkg/exemplars/exemplarspb"
+	"github.com/thanos-io/thanos/pkg/info/infopb"
 	"google.golang.org/grpc"
 
 	"github.com/thanos-io/thanos/pkg/component"
@@ -65,6 +66,11 @@ type MetadataSpec interface {
 
 type ExemplarSpec interface {
 	// Addr returns ExemplarsAPI Address for the exemplars spec. It is used as its ID.
+	Addr() string
+}
+
+type InfoSpec interface {
+	// Addr returns InfoAPI Address for the info spec. It is used as its ID.
 	Addr() string
 }
 
@@ -198,6 +204,7 @@ type StoreSet struct {
 
 	// Store specifications can change dynamically. If some store is missing from the list, we assuming it is no longer
 	// accessible and we close gRPC client for it.
+	infoSpec            func() []InfoSpec
 	storeSpecs          func() []StoreSpec
 	ruleSpecs           func() []RuleSpec
 	targetSpecs         func() []TargetSpec
@@ -228,6 +235,7 @@ func NewStoreSet(
 	targetSpecs func() []TargetSpec,
 	metadataSpecs func() []MetadataSpec,
 	exemplarSpecs func() []ExemplarSpec,
+	infoSpecs func() []InfoSpec,
 	dialOpts []grpc.DialOption,
 	unhealthyStoreTimeout time.Duration,
 ) *StoreSet {
@@ -239,6 +247,11 @@ func NewStoreSet(
 	if logger == nil {
 		logger = log.NewNopLogger()
 	}
+
+	if infoSpecs == nil {
+		infoSpecs = func() []InfoSpec { return nil }
+	}
+
 	if storeSpecs == nil {
 		storeSpecs = func() []StoreSpec { return nil }
 	}
@@ -257,6 +270,7 @@ func NewStoreSet(
 
 	ss := &StoreSet{
 		logger:                log.With(logger, "component", "storeset"),
+		infoSpec:              infoSpecs,
 		storeSpecs:            storeSpecs,
 		ruleSpecs:             ruleSpecs,
 		targetSpecs:           targetSpecs,
@@ -289,6 +303,9 @@ type storeRef struct {
 	// If target is not nil, then this store also supports targets API.
 	target targetspb.TargetsClient
 
+	// If info is not nil, then this store also supports Info API.
+	info infopb.InfoClient
+
 	// Meta (can change during runtime).
 	labelSets []labels.Labels
 	storeType component.StoreAPI
@@ -306,6 +323,21 @@ func (s *storeRef) Update(labelSets []labels.Labels, minTime int64, maxTime int6
 	s.labelSets = labelSets
 	s.minTime = minTime
 	s.maxTime = maxTime
+	s.rule = rule
+	s.target = target
+	s.metadata = metadata
+	s.exemplar = exemplar
+}
+
+func (s *storeRef) UpdateWithStore(labelSets []labels.Labels, minTime int64, maxTime int64, storeType component.StoreAPI, store storepb.StoreClient, rule rulespb.RulesClient, target targetspb.TargetsClient, metadata metadatapb.MetadataClient, exemplar exemplarspb.ExemplarsClient) {
+	s.mtx.Lock()
+	defer s.mtx.Unlock()
+
+	s.storeType = storeType
+	s.labelSets = labelSets
+	s.minTime = minTime
+	s.maxTime = maxTime
+	s.StoreClient = store
 	s.rule = rule
 	s.target = target
 	s.metadata = metadata
@@ -483,6 +515,7 @@ func (s *StoreSet) getActiveStores(ctx context.Context, stores map[string]*store
 		targetAddrSet   = make(map[string]struct{})
 		metadataAddrSet = make(map[string]struct{})
 		exemplarAddrSet = make(map[string]struct{})
+		infoAddrSet     = make(map[string]struct{})
 	)
 
 	// Gather active stores map concurrently. Build new store if does not exist already.
@@ -597,6 +630,105 @@ func (s *StoreSet) getActiveStores(ctx context.Context, stores map[string]*store
 			level.Warn(s.logger).Log("msg", "ignored rule store", "address", ruleAddr)
 		}
 	}
+
+	// Gather healthy stores map concurrently using info addresses. Build new store if does not exist already.
+	for _, infoSpec := range s.infoSpec() {
+		if _, ok := infoAddrSet[infoSpec.Addr()]; ok {
+			level.Warn(s.logger).Log("msg", "duplicated address in info nodes", "address", infoSpec.Addr())
+			continue
+		}
+		infoAddrSet[infoSpec.Addr()] = struct{}{}
+
+		wg.Add(1)
+		go func(spec InfoSpec) {
+			defer wg.Done()
+
+			addr := spec.Addr()
+
+			ctx, cancel := context.WithTimeout(ctx, s.gRPCInfoCallTimeout)
+			defer cancel()
+
+			st, seenAlready := stores[addr]
+			if !seenAlready {
+				// New store or was unactive and was removed in the past - create the new one.
+				conn, err := grpc.DialContext(ctx, addr, s.dialOpts...)
+				if err != nil {
+					s.updateStoreStatus(&storeRef{addr: addr}, err)
+					level.Warn(s.logger).Log("msg", "update of store node failed", "err", errors.Wrap(err, "dialing connection"), "address", addr)
+					return
+				}
+
+				st = &storeRef{
+					info:      infopb.NewInfoClient(conn),
+					storeType: component.UnknownStoreAPI,
+					cc:        conn,
+					addr:      addr,
+					logger:    s.logger,
+				}
+			}
+
+			info, err := st.info.Info(ctx, &infopb.InfoReq{}, grpc.WaitForReady(true))
+			if err != nil {
+				if !seenAlready {
+					// Close only if new
+					// Unactive `s.stores` will be closed later on.
+					st.Close()
+				}
+
+				s.updateStoreStatus(st, err)
+				level.Warn(s.logger).Log("msg", "update of node failed", "err", errors.Wrap(err, "getting metadata"), "address", addr)
+
+				return
+			}
+
+			s.updateStoreStatus(st, nil)
+
+			labelSets := make([]labels.Labels, 0, len(info.LabelSets))
+			for _, ls := range info.LabelSets {
+				labelSets = append(labelSets, ls.PromLabels())
+			}
+
+			var minTime, maxTime int64
+			var store storepb.StoreClient
+			if info.Store != nil {
+				store = storepb.NewStoreClient(st.cc)
+				minTime = info.Store.MinTime
+				maxTime = info.Store.MaxTime
+			}
+
+			var rule rulespb.RulesClient
+			if info.Rules != nil {
+				rule = rulespb.NewRulesClient(st.cc)
+			}
+
+			var target targetspb.TargetsClient
+			if info.Targets != nil {
+				target = targetspb.NewTargetsClient(st.cc)
+			}
+
+			var metadata metadatapb.MetadataClient
+			if info.MetricMetadata != nil {
+				metadata = metadatapb.NewMetadataClient(st.cc)
+			}
+
+			var exemplar exemplarspb.ExemplarsClient
+			if info.Exemplars != nil {
+				// min/max range is also provided by in the response of Info rpc call
+				// but we are not using this metadata anywhere right now so ignoring.
+				exemplar = exemplarspb.NewExemplarsClient(st.cc)
+			}
+
+			s.updateStoreStatus(st, nil)
+			st.UpdateWithStore(labelSets, minTime, maxTime, component.FromString(info.ComponentType), store, rule, target, metadata, exemplar)
+
+			mtx.Lock()
+			defer mtx.Unlock()
+
+			activeStores[addr] = st
+		}(infoSpec)
+	}
+	wg.Wait()
+
 	return activeStores
 }
 

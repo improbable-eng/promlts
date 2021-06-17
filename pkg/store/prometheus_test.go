@@ -320,8 +320,8 @@ func TestPrometheusStore_SeriesLabels_e2e(t *testing.T) {
 				Matchers: []storepb.LabelMatcher{
 					{Type: storepb.LabelMatcher_EQ, Name: "job", Value: "test"},
 				},
-				MinTime: func() int64 { minTime, _ := promStore.timestamps(); return minTime }(),
-				MaxTime: func() int64 { _, maxTime := promStore.timestamps(); return maxTime }(),
+				MinTime: func() int64 { minTime, _ := promStore.Timestamps(); return minTime }(),
+				MaxTime: func() int64 { _, maxTime := promStore.Timestamps(); return maxTime }(),
 			},
 			expected: []storepb.Series{
 				{

@@ -31,6 +31,8 @@ import (
 	"github.com/thanos-io/thanos/pkg/extprom"
 	extpromhttp "github.com/thanos-io/thanos/pkg/extprom/http"
 	"github.com/thanos-io/thanos/pkg/gate"
+	"github.com/thanos-io/thanos/pkg/info"
+	"github.com/thanos-io/thanos/pkg/info/infopb"
 	"github.com/thanos-io/thanos/pkg/logging"
 	"github.com/thanos-io/thanos/pkg/model"
 	"github.com/thanos-io/thanos/pkg/objstore/client"
@@ -40,6 +42,7 @@ import (
 	httpserver "github.com/thanos-io/thanos/pkg/server/http"
 	"github.com/thanos-io/thanos/pkg/store"
 	storecache "github.com/thanos-io/thanos/pkg/store/cache"
+	"github.com/thanos-io/thanos/pkg/store/labelpb"
 	"github.com/thanos-io/thanos/pkg/tls"
 	"github.com/thanos-io/thanos/pkg/ui"
 )
@@ -382,6 +385,25 @@ func runStore(
 			cancel()
 		})
 	}
+
+	infoSrv := info.NewInfoServer(
+		component.Store.String(),
+		func() []labelpb.ZLabelSet {
+			return bs.LabelSet()
+		},
+		func() *infopb.StoreInfo {
+			mint, maxt := bs.TimeRange()
+			return &infopb.StoreInfo{
+				MinTime: mint,
+				MaxTime: maxt,
+			}
+		},
+		nil,
+		nil,
+		nil,
+		nil,
+	)
+
 	// Start query (proxy) gRPC StoreAPI.
 	{
 		tlsCfg, err := tls.NewServerConfig(log.With(logger, "protocol", "gRPC"), conf.grpcConfig.tlsSrvCert, conf.grpcConfig.tlsSrvKey, conf.grpcConfig.tlsSrvClientCA)
@@ -391,6 +413,7 @@ func runStore(
 
 		s := grpcserver.New(logger, reg, tracer, grpcLogOpts, tagOpts, conf.component, grpcProbe,
 			grpcserver.WithServer(store.RegisterStoreServer(bs)),
+			grpcserver.WithServer(info.RegisterInfoServer(infoSrv)),
 			grpcserver.WithListen(conf.grpcConfig.bindAddress),
 			grpcserver.WithGracePeriod(time.Duration(conf.grpcConfig.gracePeriod)),
 			grpcserver.WithTLSConfig(tlsCfg),

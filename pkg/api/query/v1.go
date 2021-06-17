@@ -72,6 +72,12 @@ const (
 	Stats                    = "stats"
 )
 
+var (
+	// Default minimum and maximum time values used by Prometheus when they are not passed as query parameter.
+	MinTime = time.Unix(math.MinInt64/1000+62135596801, 0).UTC()
+	MaxTime = time.Unix(math.MaxInt64/1000-62135596801, 999999999).UTC()
+)
+
 // QueryAPI is an API used by Thanos Querier.
 type QueryAPI struct {
 	baseAPI         *api.BaseAPI

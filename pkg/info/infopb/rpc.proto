@@ -23,12 +23,12 @@ option (gogoproto.goproto_sizecache_all) = false;
 /// Info represents the API that is responsible for gathering metadata about the all APIs supported by the component.
 service Info {
     /// Info returns the metadata (Eg. LabelSets, Min/Max time) about all the APIs the component supports.
-    rpc Info(InfoRequest) returns (InfoResponse);
+    rpc Info(InfoReq) returns (InfoResp);
 }
 
-message InfoRequest {}
+message InfoReq {}
 
-message InfoResponse {
+message InfoResp {
     repeated ZLabelSet label_sets      = 1 [(gogoproto.nullable) = false];
     string ComponentType               = 2;
     

@@ -290,6 +290,11 @@ Query node exposing PromQL enabled Query API with data retrieved from multiple
 store nodes.
 
 Flags:
+      --endpoint=<endpoint> ...  Addresses of statically configured Thanos API
+                                 servers (repeatable). The scheme may be
+                                 prefixed with 'dns+' or 'dnssrv+' to detect
+                                 Thanos API servers through respective DNS
+                                 lookups.
       --grpc-address="0.0.0.0:10901"
                                  Listen ip:port address for gRPC endpoints
                                  (StoreAPI). Make sure this address is routable
