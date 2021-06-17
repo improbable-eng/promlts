@@ -16,7 +16,9 @@ import (
 	"time"
 
 	"github.com/cortexproject/cortex/integration/e2e"
+	common_cfg "github.com/prometheus/common/config"
 	"github.com/prometheus/common/model"
+	"github.com/prometheus/prometheus/config"
 	"github.com/prometheus/prometheus/discovery/targetgroup"
 	"gopkg.in/yaml.v2"
 
@@ -24,6 +26,7 @@ import (
 	http_util "github.com/thanos-io/thanos/pkg/http"
 	"github.com/thanos-io/thanos/pkg/promclient"
 	"github.com/thanos-io/thanos/pkg/query"
+	"github.com/thanos-io/thanos/pkg/rules/remotewrite"
 	"github.com/thanos-io/thanos/pkg/rules/rulespb"
 	"github.com/thanos-io/thanos/pkg/testutil"
 	"github.com/thanos-io/thanos/test/e2e/e2ethanos"
@@ -72,6 +75,7 @@ groups:
     annotations:
       summary: "I always complain and I have been loaded via /-/reload."
 `
+	amTimeout = model.Duration(10 * time.Second)
 )
 
 func createRuleFile(t *testing.T, path, content string) {
@@ -169,7 +173,7 @@ func TestRule(t *testing.T) {
 	testutil.Ok(t, err)
 	testutil.Ok(t, s.StartAndWaitReady(am1, am2))
 
-	r, err := e2ethanos.NewRuler(s.SharedDir(), "1", rulesSubDir, []alert.AlertmanagerConfig{
+	r, err := e2ethanos.NewTSDBRuler(s.SharedDir(), "1", rulesSubDir, []alert.AlertmanagerConfig{
 		{
 			EndpointsConfig: http_util.EndpointsConfig{
 				FileSDConfigs: []http_util.FileSDConfig{
@@ -184,7 +188,7 @@ func TestRule(t *testing.T) {
 				},
 				Scheme: "http",
 			},
-			Timeout:    model.Duration(10 * time.Second),
+			Timeout:    amTimeout,
 			APIVersion: alert.APIv1,
 		},
 	}, []query.Config{
@@ -376,6 +380,96 @@ func TestRule(t *testing.T) {
 	for i, a := range alrts {
 		testutil.Assert(t, a.Labels.Equal(expAlertLabels[i]), "unexpected labels %s", a.Labels)
 	}
+}
+
+// TestRule_CanRemoteWriteData checks that Thanos Ruler can be run in stateless mode
+// where it remote_writes rule evaluations to a Prometheus remote-write endpoint (typically
+// a Thanos Receiver).
+func TestRule_CanRemoteWriteData(t *testing.T) {
+	t.Parallel()
+
+	testRuleRecordAbsentMetric := `
+groups:
+- name: example_record_rules
+  interval: 1s
+  rules:
+  - record: test_absent_metric
+    expr: absent(nonexistent{job='thanos-receive'})
+`
+
+	s, err := e2e.NewScenario("e2e_test_rule_remote_write")
+	testutil.Ok(t, err)
+	t.Cleanup(e2ethanos.CleanScenario(t, s))
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	t.Cleanup(cancel)
+
+	rulesSubDir := "rules"
+	rulesPath := filepath.Join(s.SharedDir(), rulesSubDir)
+	testutil.Ok(t, os.MkdirAll(rulesPath, os.ModePerm))
+	createRuleFile(t, filepath.Join(rulesPath, "rules-0.yaml"), testRuleRecordAbsentMetric)
+
+	am, err := e2ethanos.NewAlertmanager(s.SharedDir(), "1")
+	testutil.Ok(t, err)
+	testutil.Ok(t, s.StartAndWaitReady(am))
+
+	receiver, err := e2ethanos.NewReceiver(s.SharedDir(), s.NetworkName(), "1", 1)
+	testutil.Ok(t, err)
+	testutil.Ok(t, s.StartAndWaitReady(receiver))
+	rwURL := mustURLParse(t, e2ethanos.RemoteWriteEndpoint(receiver.NetworkEndpoint(8081)))
+
+	querier, err := e2ethanos.NewQuerierBuilder(s.SharedDir(), "1", []string{receiver.GRPCNetworkEndpoint()}).Build()
+	testutil.Ok(t, err)
+	testutil.Ok(t, s.StartAndWaitReady(querier))
+	r, err := e2ethanos.NewStatelessRuler(s.SharedDir(), "1", rulesSubDir, []alert.AlertmanagerConfig{
+		{
+			EndpointsConfig: http_util.EndpointsConfig{
+				StaticAddresses: []string{
+					am.NetworkHTTPEndpoint(),
+				},
+				Scheme: "http",
+			},
+			Timeout:    amTimeout,
+			APIVersion: alert.APIv1,
+		},
+	}, []query.Config{
+		{
+			EndpointsConfig: http_util.EndpointsConfig{
+				StaticAddresses: []string{
+					querier.NetworkHTTPEndpoint(),
+				},
+				Scheme: "http",
+			},
+		},
+	}, &remotewrite.Config{
+		Name: "ruler-rw-receivers",
+		RemoteStore: &config.RemoteWriteConfig{
+			URL:  &common_cfg.URL{URL: rwURL},
+			Name: "thanos-receiver",
+		},
+	})
+	testutil.Ok(t, err)
+	testutil.Ok(t, s.StartAndWaitReady(r))
+
+	t.Run("can fetch remote-written samples from receiver", func(t *testing.T) {
+		testRecordedSamples := "test_absent_metric"
+		queryAndAssertSeries(t, ctx, querier.HTTPEndpoint(), testRecordedSamples, promclient.QueryOptions{
+			Deduplicate: false,
+		}, []model.Metric{
+			{
+				"__name__":  "test_absent_metric",
+				"job":       "thanos-receive",
+				"receive":   "1",
+				"tenant_id": "default-tenant",
+			},
+		})
+	})
+}
+
+// TestRule_CanPersistWALData checks that in stateless mode, Thanos Ruler can persist rule evaluations
+// which couldn't be sent to the remote write endpoint (e.g because receiver isn't available).
+func TestRule_CanPersistWALData(t *testing.T) {
+	//TODO: Implement test with unavailable remote-write endpoint(receiver)
 }
 
 // Test Ruler behavior on different storepb.PartialResponseStrategy when having partial response from single `failingStoreAPI`.

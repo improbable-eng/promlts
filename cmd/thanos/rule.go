@@ -30,6 +30,7 @@ import (
 	"github.com/prometheus/prometheus/pkg/relabel"
 	"github.com/prometheus/prometheus/promql"
 	"github.com/prometheus/prometheus/rules"
+	"github.com/prometheus/prometheus/storage"
 	"github.com/prometheus/prometheus/tsdb"
 	"github.com/prometheus/prometheus/util/strutil"
 	"github.com/thanos-io/thanos/pkg/errutil"
@@ -50,6 +51,7 @@ import (
 	"github.com/thanos-io/thanos/pkg/promclient"
 	"github.com/thanos-io/thanos/pkg/query"
 	thanosrules "github.com/thanos-io/thanos/pkg/rules"
+	"github.com/thanos-io/thanos/pkg/rules/remotewrite"
 	"github.com/thanos-io/thanos/pkg/runutil"
 	grpcserver "github.com/thanos-io/thanos/pkg/server/grpc"
 	httpserver "github.com/thanos-io/thanos/pkg/server/http"
@@ -74,6 +76,8 @@ type ruleConfig struct {
 	alertmgrsConfigYAML    []byte
 	alertQueryURL          *url.URL
 	alertRelabelConfigYAML []byte
+
+	rwConfig *extflag.PathOrContent
 
 	resendDelay    time.Duration
 	evalInterval   time.Duration
@@ -117,6 +121,8 @@ func registerRule(app *extkingpin.App) {
 		Default("1m").DurationVar(&conf.resendDelay)
 	cmd.Flag("eval-interval", "The default evaluation interval to use.").
 		Default("30s").DurationVar(&conf.evalInterval)
+
+	conf.rwConfig = extflag.RegisterPathOrContent(cmd, "remote-write.config", "YAML config for the remote-write server where samples should be sent to. This automatically enables stateless mode for ruler and no series will be stored in the ruler's TSDB. If an empty config (or file) is provided, the flag is ignored and ruler is run with its own TSDB.", false)
 
 	reqLogDecision := cmd.Flag("log.request.decision", "Deprecation Warning - This flag would be soon deprecated, and replaced with `request.logging-config`. Request Logging for logging the start and end of requests. By default this flag is disabled. LogFinishCall: Logs the finish call of the requests. LogStartAndFinishCall: Logs the start and finish call of the requests. NoLogCall: Disable request logging.").Default("").Enum("NoLogCall", "LogFinishCall", "LogStartAndFinishCall", "")
 
@@ -316,25 +322,52 @@ func runRule(
 		// Discover and resolve query addresses.
 		addDiscoveryGroups(g, queryClient, conf.query.dnsSDInterval)
 	}
+	var (
+		appendable storage.Appendable
+		queryable  storage.Queryable
+		db         *tsdb.DB
+	)
 
-	db, err := tsdb.Open(conf.dataDir, log.With(logger, "component", "tsdb"), reg, tsdbOpts)
+	rwCfgYAML, err := conf.rwConfig.Content()
 	if err != nil {
-		return errors.Wrap(err, "open TSDB")
+		return err
 	}
 
-	level.Debug(logger).Log("msg", "removing storage lock file if any")
-	if err := removeLockfileIfAny(logger, conf.dataDir); err != nil {
-		return errors.Wrap(err, "remove storage lock files")
-	}
+	if len(rwCfgYAML) > 0 {
+		var rwCfg remotewrite.Config
+		rwCfg, err = remotewrite.LoadRemoteWriteConfig(rwCfgYAML)
+		if err != nil {
+			return err
+		}
+		walDir := filepath.Join(conf.dataDir, rwCfg.Name)
+		remoteStore, err := remotewrite.NewFanoutStorage(logger, reg, walDir, rwCfg)
+		if err != nil {
+			return errors.Wrap(err, "set up remote-write store for ruler")
+		}
+		appendable = remoteStore
+		queryable = remoteStore
+	} else {
+		db, err = tsdb.Open(conf.dataDir, log.With(logger, "component", "tsdb"), reg, tsdbOpts)
+		if err != nil {
+			return errors.Wrap(err, "open TSDB")
+		}
 
-	{
-		done := make(chan struct{})
-		g.Add(func() error {
-			<-done
-			return db.Close()
-		}, func(error) {
-			close(done)
-		})
+		level.Debug(logger).Log("msg", "removing storage lock file if any")
+		if err := removeLockfileIfAny(logger, conf.dataDir); err != nil {
+			return errors.Wrap(err, "remove storage lock files")
+		}
+
+		{
+			done := make(chan struct{})
+			g.Add(func() error {
+				<-done
+				return db.Close()
+			}, func(error) {
+				close(done)
+			})
+		}
+		appendable = db
+		queryable = db
 	}
 
 	// Build the Alertmanager clients.
@@ -428,9 +461,9 @@ func runRule(
 			rules.ManagerOptions{
 				NotifyFunc:  notifyFunc,
 				Logger:      logger,
-				Appendable:  db,
+				Appendable:  appendable,
 				ExternalURL: nil,
-				Queryable:   db,
+				Queryable:   queryable,
 				ResendDelay: conf.resendDelay,
 			},
 			queryFuncCreator(logger, queryClients, metrics.duplicatedQuery, metrics.ruleEvalWarnings, conf.query.httpMethod),

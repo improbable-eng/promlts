@@ -65,9 +65,9 @@ func TestRulesAPI_Fanout(t *testing.T) {
 	testutil.Ok(t, s.StartAndWaitReady(prom1, sidecar1, prom2, sidecar2))
 
 	// 2x Rulers.
-	r1, err := e2ethanos.NewRuler(s.SharedDir(), "rule1", thanosRulesSubDir, nil, nil)
+	r1, err := e2ethanos.NewTSDBRuler(s.SharedDir(), "rule1", thanosRulesSubDir, nil, nil)
 	testutil.Ok(t, err)
-	r2, err := e2ethanos.NewRuler(s.SharedDir(), "rule2", thanosRulesSubDir, nil, nil)
+	r2, err := e2ethanos.NewTSDBRuler(s.SharedDir(), "rule2", thanosRulesSubDir, nil, nil)
 	testutil.Ok(t, err)
 
 	stores := []string{sidecar1.GRPCNetworkEndpoint(), sidecar2.GRPCNetworkEndpoint(), r1.NetworkEndpointFor(s.NetworkName(), 9091), r2.NetworkEndpointFor(s.NetworkName(), 9091)}
@@ -87,9 +87,9 @@ func TestRulesAPI_Fanout(t *testing.T) {
 	}
 
 	// Recreate rulers with the corresponding query config.
-	r1, err = e2ethanos.NewRuler(s.SharedDir(), "rule1", thanosRulesSubDir, nil, queryCfg)
+	r1, err = e2ethanos.NewTSDBRuler(s.SharedDir(), "rule1", thanosRulesSubDir, nil, queryCfg)
 	testutil.Ok(t, err)
-	r2, err = e2ethanos.NewRuler(s.SharedDir(), "rule2", thanosRulesSubDir, nil, queryCfg)
+	r2, err = e2ethanos.NewTSDBRuler(s.SharedDir(), "rule2", thanosRulesSubDir, nil, queryCfg)
 	testutil.Ok(t, err)
 	testutil.Ok(t, s.StartAndWaitReady(r1, r2))
 
