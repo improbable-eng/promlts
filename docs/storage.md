@@ -418,7 +418,7 @@ At that point, anyone can use your provider by spec.
 
 ## Data in Object Storage
 
-Thanos supports writing and reading data in native Prometheus `TSDB blocks` in [TSDB format](https://github.com/prometheus/prometheus/tree/master/tsdb/docs/format). This is the format used by [Prometheus](https://prometheus.io) TSDB database for persisting data on the local disk. With the efficient index and [chunk](design.md/#chunk) binary formats, it also fits well to be used directly from object storage using range GET API.
+Thanos supports writing and reading data in native Prometheus `TSDB blocks` in [TSDB format](https://github.com/prometheus/prometheus/tree/master/tsdb/docs/format). This is the format used by [Prometheus](https://prometheus.io) TSDB database for persisting data on the local disk. With the efficient index and [chunk](design.md#chunk) binary formats, it also fits well to be used directly from object storage using range GET API.
 
 Following sections explain this format in details with the additional files and entries that Thanos system supports.
 
@@ -616,7 +616,7 @@ From high level it allows to find:
 * Label names
 * Label values for label name
 * All series labels
-* Given (or all) series' chunk reference. This can be used to find [chunk](design.md/#chunk) with samples in the [chunk files](#chunks-file-format)
+* Given (or all) series' chunk reference. This can be used to find [chunk](design.md#chunk) with samples in the [chunk files](#chunks-file-format)
 
 The following describes the format of the `index` file found in each block directory. It is terminated by a table of contents which serves as an entry point into the index.
 
@@ -678,7 +678,7 @@ The section contains a sequence of the string entries, each prefixed with the st
 
 ##### Series
 
-The section contains a sequence of series that hold the label set of the series as well as its [chunks](design.md/#chunk) within the block. The series are sorted lexicographically by their label sets. Each series section is aligned to 16 bytes. The ID for a series is the `offset/16`. This serves as the series' ID in all subsequent references. Thereby, a sorted list of series IDs implies a lexicographically sorted list of series label sets.
+The section contains a sequence of series that hold the label set of the series as well as its [chunks](design.md#chunk) within the block. The series are sorted lexicographically by their label sets. Each series section is aligned to 16 bytes. The ID for a series is the `offset/16`. This serves as the series' ID in all subsequent references. Thereby, a sorted list of series IDs implies a lexicographically sorted list of series label sets.
 
 ```
 ┌───────────────────────────────────────┐
@@ -692,9 +692,9 @@ The section contains a sequence of series that hold the label set of the series 
 └───────────────────────────────────────┘
 ```
 
-Every series entry first holds its number of labels, followed by tuples of symbol table references that contain the label name and value. The label pairs are lexicographically sorted. After the labels, the number of indexed [chunks](design.md/#chunk) is encoded, followed by a sequence of metadata entries containing the chunks minimum (`mint`) and maximum (`maxt`) timestamp and a reference to its position in the chunk file. The `mint` is the time of the first sample and `maxt` is the time of the last sample in the chunk. Holding the time range data in the index allows dropping chunks irrelevant to queried time ranges without accessing them directly.
+Every series entry first holds its number of labels, followed by tuples of symbol table references that contain the label name and value. The label pairs are lexicographically sorted. After the labels, the number of indexed [chunks](design.md#chunk) is encoded, followed by a sequence of metadata entries containing the chunks minimum (`mint`) and maximum (`maxt`) timestamp and a reference to its position in the chunk file. The `mint` is the time of the first sample and `maxt` is the time of the last sample in the chunk. Holding the time range data in the index allows dropping chunks irrelevant to queried time ranges without accessing them directly.
 
-`mint` of the first [chunk](design.md/#chunk) is stored, it's `maxt` is stored as a delta and the `mint` and `maxt` are encoded as deltas to the previous time for subsequent chunks. Similarly, the reference of the first chunk is stored and the next ref is stored as a delta to the previous one.
+`mint` of the first [chunk](design.md#chunk) is stored, it's `maxt` is stored as a delta and the `mint` and `maxt` are encoded as deltas to the previous time for subsequent chunks. Similarly, the reference of the first chunk is stored and the next ref is stored as a delta to the previous one.
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────┐
@@ -860,7 +860,7 @@ The table of contents serves as an entry point to the entire index and points to
 
 The following describes the format of a chunks file, which is created in the `chunks/` directory of a block. The maximum size per segment file is 512MiB.
 
-[Chunks](design.md/#chunk) in the files are referenced from the index by uint64 composed of in-file offset (lower 4 bytes) and segment sequence number (upper 4 bytes).
+[Chunks](design.md#chunk) in the files are referenced from the index by uint64 composed of in-file offset (lower 4 bytes) and segment sequence number (upper 4 bytes).
 
 ```
 ┌──────────────────────────────┐

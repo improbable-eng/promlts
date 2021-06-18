@@ -35,7 +35,7 @@ Since for Querier "a backend" is anything that implements gRPC StoreAPI we can a
 * Metrics received from Prometheus remote write streams (see [Receiver](receive.md))
 * Another Querier (you can stack Queriers on top of each other)
 * Non-Prometheus systems!
-  * e.g [OpenTSDB](../integrations.md#opentsdb)
+  * e.g [OpenTSDB](../integrations.md#opentsdb-as-storeapi)
 
 Thanks to that, you can run queries (manually, from Grafana or via Alerting rule) that aggregate metrics from mix of those sources.
 

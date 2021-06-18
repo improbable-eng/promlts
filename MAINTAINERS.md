@@ -86,7 +86,7 @@ Self explanatory ones:
 
 ## Storage plugins maintainers
 
-Maintainers of bucket storage clients are available [here](/docs/storage.md#implementations)
+Maintainers of bucket storage clients are available [here](docs/storage.md#supported-clients)
 
 ## How to be maintainer?
 

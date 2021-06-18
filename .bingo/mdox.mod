@@ -4,4 +4,4 @@ go 1.16
 
 replace github.com/Kunde21/markdownfmt/v2 => github.com/bwplotka/markdownfmt/v2 v2.0.0-20210616121647-559e77044d46
 
-require github.com/bwplotka/mdox v0.2.2-0.20210617084122-22b44c491197
+require github.com/bwplotka/mdox v0.2.2-0.20210617120014-ffae630a4141

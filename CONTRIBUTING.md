@@ -29,7 +29,7 @@ If you encounter a security vulnerability, please refer to [Reporting a Vulnerab
 
 When contributing a complex change to Thanos repository, please discuss the change you wish to make within a Github issue, in Slack, or by another method with the owners of this repository before making the change.
 
-Adding a large new feature or/and component to Thanos should be done by first creating a [proposal](docs/contributing/proposal-process.md) document outlining the design decisions of the change, motivations for the change, and any alternatives that might have been considered.
+Adding a large new feature or/and component to Thanos should be done by first creating a [proposal](docs/proposals-done) document outlining the design decisions of the change, motivations for the change, and any alternatives that might have been considered.
 
 ## General Naming
 

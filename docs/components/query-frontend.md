@@ -20,7 +20,7 @@ thanos query-frontend \
 
 _**NOTE:** Currently only range queries (`/api/v1/query_range` API call) are actually processed through Query Frontend. All other API calls just directly go to the downstream Querier, which means only range queries are split and cached. But we are planning to support instant queries as well.
 
-For more information please check out [initial design proposal](https://thanos.io/tip/proposals/202004_embedd_cortex_frontend.md/).
+For more information please check out [initial design proposal](https://thanos.io/tip/proposals-done/202004-embedd-cortex-frontend.md/).
 
 ## Features
 

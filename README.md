@@ -24,7 +24,7 @@ Concretely the aims of the project are:
 * [Design](https://thanos.io/tip/thanos/design.md/)
 * [Blog posts](docs/getting-started.md#blog-posts)
 * [Talks](docs/getting-started.md#talks)
-* [Proposals](docs/proposals)
+* [Proposals](docs/proposals-done)
 * [Integrations](docs/integrations.md)
 
 ## Features

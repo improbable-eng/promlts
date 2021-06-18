@@ -55,6 +55,7 @@ JSONNET_VENDOR_DIR      ?= mixin/vendor
 
 WEB_DIR           ?= website
 WEBSITE_BASE_URL  ?= https://thanos.io
+MDOX_VALIDATE_CONFIG ?= .mdox.validate.yaml
 PUBLIC_DIR        ?= $(WEB_DIR)/public
 ME                ?= $(shell whoami)
 
@@ -171,13 +172,13 @@ docker-push:
 docs: ## Regenerates flags in docs for all thanos commands localise links, ensure GitHub format.
 docs: $(MDOX) build
 	@echo ">> generating docs"
-	PATH=${PATH}:$(GOBIN) $(MDOX) fmt --links.localize.address-regex="https://thanos.io/.*" $(MD_FILES_TO_FORMAT)
+	PATH=${PATH}:$(GOBIN) $(MDOX) fmt -l --links.localize.address-regex="https://thanos.io/.*" --links.validate.config-file=$(MDOX_VALIDATE_CONFIG) $(MD_FILES_TO_FORMAT)
 
 .PHONY: check-docs
 check-docs: ## checks docs against discrepancy with flags, links, white noise.
 check-docs: $(MDOX) build
-	@echo ">> checking local links"
-	PATH=${PATH}:$(GOBIN) $(MDOX) fmt --check --links.localize.address-regex="https://thanos.io/.*" $(MD_FILES_TO_FORMAT)
+	@echo ">> checking formatting and local/remote links"
+	PATH=${PATH}:$(GOBIN) $(MDOX) fmt --check -l --links.localize.address-regex="https://thanos.io/.*" --links.validate.config-file=$(MDOX_VALIDATE_CONFIG) $(MD_FILES_TO_FORMAT)
 	$(call require_clean_work_tree,'run make docs and commit changes')
 
 .PHONY: shell-format
