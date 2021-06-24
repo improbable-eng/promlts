@@ -1,8 +1,4 @@
----
-type: docs
-title: Sharding
-menu: thanos
----
+# Sharding
 
 # Background
 

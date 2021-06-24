@@ -27,6 +27,7 @@ endif
 GOPATH            ?= $(shell go env GOPATH)
 TMP_GOPATH        ?= /tmp/thanos-go
 GOBIN             ?= $(firstword $(subst :, ,${GOPATH}))/bin
+export GOBIN
 
 # Promu is using this exact variable name, do not rename.
 PREFIX  ?= $(GOBIN)
@@ -56,6 +57,8 @@ JSONNET_VENDOR_DIR      ?= mixin/vendor
 WEB_DIR           ?= website
 WEBSITE_BASE_URL  ?= https://thanos.io
 MDOX_VALIDATE_CONFIG ?= .mdox.validate.yaml
+# for website pre process
+export MDOX
 PUBLIC_DIR        ?= $(WEB_DIR)/public
 ME                ?= $(shell whoami)
 
@@ -266,7 +269,7 @@ else
 endif
 
 .PHONY: web-pre-process
-web-pre-process:
+web-pre-process: $(MDOX)
 	@echo ">> running documentation website pre processing"
 	scripts/website/websitepreprocess.sh
 

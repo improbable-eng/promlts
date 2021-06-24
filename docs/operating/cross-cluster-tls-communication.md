@@ -1,9 +1,3 @@
----
-type: docs
-title: Configuring Thanos Secure TLS Cross-Cluster Communication
-menu: operating
----
-
 # Configuring Thanos Secure TLS Cross-Cluster Communication
 
 ###### *This guide was contributed by the community thanks to [gmintoco](https://github.com/gmintoco)*

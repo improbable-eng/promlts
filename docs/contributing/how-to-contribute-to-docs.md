@@ -1,9 +1,3 @@
----
-type: docs
-title: Contribute to docs
-menu: contributing
----
-
 # How to contribute to Docs/Website
 
 `./docs` directory is used as markdown source files using [blackfriday](https://github.com/russross/blackfriday) to render Thanos website resources.

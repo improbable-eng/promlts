@@ -1,9 +1,3 @@
----
-type: docs
-title: Design
-menu: thanos
----
-
 # Design
 
 Thanos is a set of components that can be composed into a highly available Prometheus setup with long term storage capabilities. Its main goals are operation simplicity and retaining of Prometheus's reliability properties.

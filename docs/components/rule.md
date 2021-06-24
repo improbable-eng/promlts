@@ -1,9 +1,3 @@
----
-type: docs
-title: Rule
-menu: components
----
-
 # Rule (aka Ruler)
 
 ***NOTE:** It is recommended to keep deploying rules inside the relevant Prometheus servers locally. Use ruler only on specific cases. Read details [below](#risk) why.*

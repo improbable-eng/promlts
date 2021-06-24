@@ -1,9 +1,3 @@
----
-type: docs
-title: Integrations
-menu: thanos
----
-
 # Integrations
 
 ## StoreAPI

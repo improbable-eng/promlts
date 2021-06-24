@@ -1,0 +1,165 @@
+version: 1
+
+inputDir: "docs"
+outputDir: "website/docs-pre-processed/tip"
+extraInputGlobs:
+  - "CHANGELOG.md"
+  - "SECURITY.md"
+  - "MAINTAINERS.md"
+  - "CONTRIBUTING.md"
+  - "CODE_OF_CONDUCT.md"
+
+gitIgnored: true
+localLinksStyle:
+  hugo:
+    indexFileName: "_index.md"
+
+transformations:
+
+  - glob: "../CHANGELOG.md"
+    path: /thanos/CHANGELOG.md
+    frontMatter:
+      template: |
+        title: Changelog
+        type: docs
+        menu: thanos
+        lastmod: "{{ .Origin.LastMod }}"
+
+  - glob: "../MAINTAINERS.md"
+    path: /thanos/MAINTAINERS.md
+    frontMatter:
+      template: |
+        title: Maintainers
+        type: docs
+        menu: thanos
+        lastmod: "{{ .Origin.LastMod }}"
+
+  - glob: "../SECURITY.md"
+    path: /thanos/SECURITY.md
+    frontMatter:
+      template: |
+        title: Security
+        type: docs
+        menu: thanos
+        lastmod: "{{ .Origin.LastMod }}"
+
+  - glob: "../CODE_OF_CONDUCT.md"
+    path: /contributing/CODE_OF_CONDUCT.md
+    frontMatter:
+      template: |
+        title: Code of Conduct
+        type: docs
+        menu: contributing
+        lastmod: "{{ .Origin.LastMod }}"
+
+  - glob: "../CONTRIBUTING.md"
+    path: /contributing/CONTRIBUTING.md
+    frontMatter:
+      template: |
+        title: Contributing
+        type: docs
+        menu: contributing
+        lastmod: "{{ .Origin.LastMod }}"
+  
+  - glob: "components/README.md"
+    path: /components/_index.md
+    frontMatter:
+      template: |
+        title: "{{ .Origin.FirstHeader }}"
+
+  - glob: "operating/README.md"
+    path: /operating/_index.md
+    frontMatter:
+      template: |
+        title: "{{ .Origin.FirstHeader }}"
+
+  - glob: "contributing/README.md"
+    path: /contributing/_index.md
+    frontMatter:
+      template: |
+        title: "{{ .Origin.FirstHeader }}"
+
+  - glob: "getting-started.md"
+    path: /thanos/getting-started.md
+    frontMatter:
+      template: |
+        type: docs
+        title: "{{ .Origin.FirstHeader }}"
+        menu: thanos
+        weight: 1
+        lastmod: "{{ .Origin.LastMod }}"
+
+  - glob: "quick-tutorial.md"
+    path: /thanos/quick-tutorial.md
+    frontMatter:
+      template: |
+        type: docs
+        title: "{{ .Origin.FirstHeader }}"
+        menu: thanos
+        weight: 1
+        lastmod: "{{ .Origin.LastMod }}"
+
+  - glob: "proposals-done/README.md"
+    path: /proposals-done/_index.md
+    frontMatter:
+      template: |
+        title: "{{ .Origin.FirstHeader }}"
+
+  - glob: "proposals-accepted/README.md"
+    path: /proposals-accepted/_index.md
+    frontMatter:
+      template: |
+        title: "{{ .Origin.FirstHeader }}"
+
+  - glob: "proposals-rejected/README.md"
+    path: /proposals-rejected/_index.md
+    frontMatter:
+      template: |
+        title: "{{ .Origin.FirstHeader }}"
+
+  - glob: "README.md"
+    path: /thanos/_index.md
+    frontMatter:
+      template: |
+        title: "{{ .Origin.FirstHeader }}"
+
+  - glob: "*.md"
+    path: /thanos/*
+    frontMatter:
+      template: |
+        type: docs
+        title: "{{ .Origin.FirstHeader }}"
+        menu: thanos
+        lastmod: "{{ .Origin.LastMod }}"
+
+  - glob: "operating/*.md"
+    path: /operating/*
+    frontMatter:
+      template: |
+        type: docs
+        title: "{{ .Origin.FirstHeader }}"
+        menu: operating
+        lastmod: "{{ .Origin.LastMod }}"
+
+  - glob: "contributing/*.md"
+    path: /contributing/*
+    frontMatter:
+      template: |
+        type: docs
+        title: "{{ .Origin.FirstHeader }}"
+        menu: contributing
+        lastmod: "{{ .Origin.LastMod }}"
+
+  - glob: "components/*.md"
+    path: /components/*
+    frontMatter:
+      template: |
+        type: docs
+        title: "{{ .Origin.FirstHeader }}"
+        menu: components
+        lastmod: "{{ .Origin.LastMod }}"
+
+
+
+
+

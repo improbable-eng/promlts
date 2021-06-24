@@ -1,9 +1,3 @@
----
-type: docs
-title: Receiver
-menu: components
----
-
 # Receiver
 
 The `thanos receive` command implements the [Prometheus Remote Write API](https://prometheus.io/docs/prometheus/latest/configuration/configuration/#remote_write). It builds on top of existing Prometheus TSDB and retains its usefulness while extending its functionality with long-term-storage, horizontal scalability, and downsampling. It exposes the StoreAPI so that [Thanos Queriers](query.md) can query received metrics in real-time. The [Thanos Sidecar](sidecar.md) is not sufficient for this, as the system would always lag the block length behind (typically 2 hours).

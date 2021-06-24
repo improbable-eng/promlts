@@ -1,10 +1,3 @@
----
-weight: 1
-type: docs
-title: Getting Started
-menu: thanos
----
-
 # Getting started
 
 Thanos provides a global query view, high availability, data backup with historical, cheap data access as its core features in a single binary.

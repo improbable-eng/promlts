@@ -1,8 +1,4 @@
----
-type: docs
-title: Changing Golang version
-menu: contributing
----
+# Changing Golang version
 
 Thanos build system is pinned to certain Golang version. This is to ensure that Golang version changes is done by us in controlled, traceable way.
 

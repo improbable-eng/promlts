@@ -1,10 +1,3 @@
----
-weight: 1
-type: docs
-title: Quick Tutorial
-menu: thanos
----
-
 # Quick Tutorial
 
 Feel free to check the free, in-browser interactive tutorial [as Katacoda Thanos Course](https://katacoda.com/thanos/courses/thanos) We will be progressively updating our Katacoda Course with more scenarios.

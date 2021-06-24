@@ -1,9 +1,3 @@
----
-type: docs
-title: Object Storage & Data Format
-menu: thanos
----
-
 # Object Storage & Data Format
 
 Thanos uses object storage as primary storage for metrics and metadata related to them. In this document you can learn how to configure your object storage and what is the data layout and format for primary Thanos components that are "block" aware, like: `sidecar` `compact`, `receive` and `store gateway`.

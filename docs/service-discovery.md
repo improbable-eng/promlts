@@ -1,9 +1,3 @@
----
-type: docs
-title: Service Discovery
-menu: thanos
----
-
 # Service Discovery
 
 Service Discovery (SD) is a vital part of several Thanos components. It allows Thanos to discover API targets required to perform certain operations.

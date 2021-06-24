@@ -1,9 +1,3 @@
----
-type: docs
-title: Community
-menu: contributing
----
-
 # Community
 
 Thanos is an open source project from the very first commit. We always value and welcome new contributors and members of the community. Here are ways to get in touch with the community:

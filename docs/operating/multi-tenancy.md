@@ -1,9 +1,3 @@
----
-type: docs
-title: Multi-Tenancy
-menu: operating
----
-
 # Multi-Tenancy
 
 Thanos supports multi-tenancy by using external labels. For such use cases, the [Thanos Sidecar](../components/sidecar.md) based approach with layered [Thanos Queriers](../components/query.md) is recommended.

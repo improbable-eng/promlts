@@ -1,9 +1,3 @@
----
-type: docs
-title: Sidecar
-menu: components
----
-
 # Sidecar
 
 The `thanos sidecar` command runs a component that gets deployed along with a Prometheus instance. This allows sidecar to optionally upload metrics to object storage and allow [Queriers](query.md) to query Prometheus data with common, efficient StoreAPI.

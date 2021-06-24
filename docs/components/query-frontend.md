@@ -1,9 +1,3 @@
----
-type: docs
-title: Query Frontend
-menu: components
----
-
 # Query Frontend
 
 The `thanos query-frontend` command implements a service that can be put in front of Thanos Queriers to improve the read path. It is based on the [Cortex Query Frontend](https://cortexmetrics.io/docs/architecture/#query-frontend) component so you can find some common features like `Splitting` and `Results Caching`.

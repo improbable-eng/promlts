@@ -1,9 +1,3 @@
----
-type: docs
-title: Troubleshooting
-menu: operating
----
-
 # Troubleshooting; Common cases
 
 ## Overlaps

@@ -1,9 +1,3 @@
----
-type: docs
-title: Tools
-menu: components
----
-
 # Tools
 
 The `thanos tools` subcommand of Thanos is a set of additional CLI, short-living tools that are meant to be ran for development or debugging purposes.

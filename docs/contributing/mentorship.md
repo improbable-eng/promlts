@@ -1,9 +1,3 @@
----
-type: docs
-title: Mentorship
-menu: contributing
----
-
 # Thanos / Prometheus Open Source Mentorship
 
 Both Thanos and Prometheus projects participate in various, periodic mentoring programs.
