@@ -16,12 +16,13 @@ describe('Blocks SourceView', () => {
     },
     gridMinTime: 1596096000000,
     gridMaxTime: 1595108031471,
+    blockCount: {},
   };
 
   const sourceView = mount(<SourceView {...defaultProps} />);
 
   it('renders a paragraph with title', () => {
-    const title = sourceView.find('div > span');
+    const title = sourceView.find('div > span').first();
     expect(title).toHaveLength(1);
     expect(title.text()).toEqual(source);
   });
