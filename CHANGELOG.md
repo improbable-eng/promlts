@@ -21,6 +21,7 @@ We use *breaking :warning:* to mark changes that are not backward compatible (re
 ### Fixed
 
 - [#4342](https://github.com/thanos-io/thanos/pull/4342) ThanosSidecarUnhealthy doesn't fire if the sidecar is never healthy
+- [#3539](https://github.com/thanos-io/thanos/pull/3539) Query: Queries timeout based on lower value out of global Query timeout and per-request timeout specified as part of the query API.
 
 ### Changed
 

@@ -209,7 +209,11 @@ func (q *querier) Select(_ bool, hints *storage.SelectHints, ms ...*labels.Match
 	// The querier has a context but it gets canceled, as soon as query evaluation is completed, by the engine.
 	// We want to prevent this from happening for the async storea API calls we make while preserving tracing context.
 	ctx := tracing.CopyTraceContext(context.Background(), q.ctx)
-	ctx, cancel := context.WithTimeout(ctx, q.selectTimeout)
+	// The timeout value at q.ctx would contain least of {global Query timeout, per-request timeout}.
+	// For q.ctx, 'per-request timeout' is set pkg/api/query/v1.go (query(),query_range()) and later in call chain 'global Query timeout' is set at prometheus/promql/engine.go (exec()).
+	requestCancelTime, _ := q.ctx.Deadline()
+	requestTimeOut := time.Until(requestCancelTime)
+	ctx, cancel := context.WithTimeout(ctx, requestTimeOut)
 	span, ctx := tracing.StartSpan(ctx, "querier_select", opentracing.Tags{
 		"minTime":  hints.Start,
 		"maxTime":  hints.End,
