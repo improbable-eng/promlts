@@ -181,18 +181,19 @@ func runReceive(
 	)
 	writer := receive.NewWriter(log.With(logger, "component", "receive-writer"), dbs)
 	webHandler := receive.NewHandler(log.With(logger, "component", "receive-handler"), &receive.Options{
-		Writer:            writer,
-		ListenAddress:     conf.rwAddress,
-		Registry:          reg,
-		Endpoint:          conf.endpoint,
-		TenantHeader:      conf.tenantHeader,
-		DefaultTenantID:   conf.defaultTenantID,
-		ReplicaHeader:     conf.replicaHeader,
-		ReplicationFactor: conf.replicationFactor,
-		Tracer:            tracer,
-		TLSConfig:         rwTLSConfig,
-		DialOpts:          dialOpts,
-		ForwardTimeout:    time.Duration(*conf.forwardTimeout),
+		Writer:                   writer,
+		ListenAddress:            conf.rwAddress,
+		Registry:                 reg,
+		Endpoint:                 conf.endpoint,
+		TenantHeader:             conf.tenantHeader,
+		DefaultTenantID:          conf.defaultTenantID,
+		ReplicaHeader:            conf.replicaHeader,
+		ReplicationFactor:        conf.replicationFactor,
+		Tracer:                   tracer,
+		TLSConfig:                rwTLSConfig,
+		DialOpts:                 dialOpts,
+		ForwardTimeout:           time.Duration(*conf.forwardTimeout),
+		SamplesLimitPerEachWrite: conf.samplesLimitPerEachWrite,
 	})
 
 	grpcProbe := prober.NewGRPC()
@@ -678,14 +679,15 @@ type receiveConfig struct {
 	hashringsFilePath    string
 	hashringsFileContent string
 
-	refreshInterval   *model.Duration
-	endpoint          string
-	tenantHeader      string
-	defaultTenantID   string
-	tenantLabelName   string
-	replicaHeader     string
-	replicationFactor uint64
-	forwardTimeout    *model.Duration
+	refreshInterval          *model.Duration
+	endpoint                 string
+	tenantHeader             string
+	defaultTenantID          string
+	tenantLabelName          string
+	replicaHeader            string
+	replicationFactor        uint64
+	forwardTimeout           *model.Duration
+	samplesLimitPerEachWrite uint64
 
 	tsdbMinBlockDuration       *model.Duration
 	tsdbMaxBlockDuration       *model.Duration
@@ -751,6 +753,8 @@ func (rc *receiveConfig) registerFlag(cmd extkingpin.FlagClause) {
 	cmd.Flag("receive.replica-header", "HTTP header specifying the replica number of a write request.").Default(receive.DefaultReplicaHeader).StringVar(&rc.replicaHeader)
 
 	cmd.Flag("receive.replication-factor", "How many times to replicate incoming write requests.").Default("1").Uint64Var(&rc.replicationFactor)
+
+	cmd.Flag("receive.samples-limit-per-each-write", "Number of allowed samples for each write API call.").Default("50000").Uint64Var(&rc.samplesLimitPerEachWrite)
 
 	rc.forwardTimeout = extkingpin.ModelDuration(cmd.Flag("receive-forward-timeout", "Timeout for each forward request.").Default("5s").Hidden())
 

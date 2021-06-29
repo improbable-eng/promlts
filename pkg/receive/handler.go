@@ -68,18 +68,19 @@ var (
 
 // Options for the web Handler.
 type Options struct {
-	Writer            *Writer
-	ListenAddress     string
-	Registry          prometheus.Registerer
-	TenantHeader      string
-	DefaultTenantID   string
-	ReplicaHeader     string
-	Endpoint          string
-	ReplicationFactor uint64
-	Tracer            opentracing.Tracer
-	TLSConfig         *tls.Config
-	DialOpts          []grpc.DialOption
-	ForwardTimeout    time.Duration
+	Writer                   *Writer
+	ListenAddress            string
+	Registry                 prometheus.Registerer
+	TenantHeader             string
+	DefaultTenantID          string
+	ReplicaHeader            string
+	Endpoint                 string
+	ReplicationFactor        uint64
+	Tracer                   opentracing.Tracer
+	TLSConfig                *tls.Config
+	DialOpts                 []grpc.DialOption
+	ForwardTimeout           time.Duration
+	SamplesLimitPerEachWrite uint64
 }
 
 // Handler serves a Prometheus remote write receiving HTTP endpoint.
@@ -329,6 +330,12 @@ func (h *Handler) receiveHTTP(w http.ResponseWriter, r *http.Request) {
 	// exit early if the request contained no data
 	if len(wreq.Timeseries) == 0 {
 		level.Debug(h.logger).Log("msg", "empty timeseries from client", "tenant", tenant)
+		return
+	}
+	// exit if the request contains samples more than configured 'receive.samples-limit-per-each-write'.
+	if len(wreq.Timeseries) > int(h.options.SamplesLimitPerEachWrite) {
+		errMessage := fmt.Sprintf("received : %d samples per-write which is higher than the configured receive.samples-limit-per-each-write: %d.", len(wreq.Timeseries), h.options.SamplesLimitPerEachWrite)
+		http.Error(w, errMessage, http.StatusRequestEntityTooLarge)
 		return
 	}
 

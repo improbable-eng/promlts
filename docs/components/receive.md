@@ -146,6 +146,9 @@ Flags:
       --receive.replication-factor=1  
                                  How many times to replicate incoming write
                                  requests.
+      --receive.samples-limit-per-each-write=50000  
+                                 Number of allowed samples for each write API
+                                 call.
       --receive.tenant-header="THANOS-TENANT"  
                                  HTTP header to determine tenant for write
                                  requests.
