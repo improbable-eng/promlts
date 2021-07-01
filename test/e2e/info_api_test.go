@@ -131,7 +131,10 @@ func TestInfo(t *testing.T) {
 
 	err = runutil.Retry(time.Second, ctx.Done(), func() error {
 
-		resp, err := http.Get(url)
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+		testutil.Ok(t, err)
+
+		resp, err := http.DefaultClient.Do(req)
 		testutil.Ok(t, err)
 
 		body, err := ioutil.ReadAll(resp.Body)
@@ -141,9 +144,8 @@ func TestInfo(t *testing.T) {
 			Data map[string][]query.StoreStatus `json:"data"`
 		}
 
-		if err = json.Unmarshal(body, &res); err != nil {
-			t.Fatalf("Error unmarshaling JSON body: %s", err)
-		}
+		err = json.Unmarshal(body, &res)
+		testutil.Ok(t, err)
 
 		if err = assertStoreStatus(t, "sidecar", res.Data, expected); err != nil {
 			return err
@@ -162,7 +164,7 @@ func assertStoreStatus(t *testing.T, component string, res map[string][]query.St
 	t.Helper()
 
 	if len(res[component]) != len(expected[component]) {
-		return fmt.Errorf("Expected %d %s, got: %d", len(expected[component]), component, len(res[component]))
+		return fmt.Errorf("expected %d %s, got: %d", len(expected[component]), component, len(res[component]))
 	}
 
 	for i, v := range res[component] {

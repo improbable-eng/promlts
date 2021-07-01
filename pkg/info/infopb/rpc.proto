@@ -2,7 +2,7 @@
 // Licensed under the Apache License 2.0.
 
 syntax = "proto3";
-package thanos;
+package thanos.info;
 
 import "store/labelpb/types.proto";
 import "gogoproto/gogo.proto";
@@ -23,12 +23,12 @@ option (gogoproto.goproto_sizecache_all) = false;
 /// Info represents the API that is responsible for gathering metadata about the all APIs supported by the component.
 service Info {
     /// Info returns the metadata (Eg. LabelSets, Min/Max time) about all the APIs the component supports.
-    rpc Info(InfoReq) returns (InfoResp);
+    rpc Info(InfoRequest) returns (InfoResponse);
 }
 
-message InfoReq {}
+message InfoRequest {}
 
-message InfoResp {
+message InfoResponse {
     repeated ZLabelSet label_sets      = 1 [(gogoproto.nullable) = false];
     string ComponentType               = 2;
     

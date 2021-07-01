@@ -29,21 +29,21 @@ var _ = math.Inf
 // proto package needs to be updated.
 const _ = proto.GoGoProtoPackageIsVersion3 // please upgrade the proto package
 
-type InfoReq struct {
+type InfoRequest struct {
 }
 
-func (m *InfoReq) Reset()         { *m = InfoReq{} }
-func (m *InfoReq) String() string { return proto.CompactTextString(m) }
-func (*InfoReq) ProtoMessage()    {}
-func (*InfoReq) Descriptor() ([]byte, []int) {
+func (m *InfoRequest) Reset()         { *m = InfoRequest{} }
+func (m *InfoRequest) String() string { return proto.CompactTextString(m) }
+func (*InfoRequest) ProtoMessage()    {}
+func (*InfoRequest) Descriptor() ([]byte, []int) {
 	return fileDescriptor_a1214ec45d2bf952, []int{0}
 }
-func (m *InfoReq) XXX_Unmarshal(b []byte) error {
+func (m *InfoRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
-func (m *InfoReq) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+func (m *InfoRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	if deterministic {
-		return xxx_messageInfo_InfoReq.Marshal(b, m, deterministic)
+		return xxx_messageInfo_InfoRequest.Marshal(b, m, deterministic)
 	} else {
 		b = b[:cap(b)]
 		n, err := m.MarshalToSizedBuffer(b)
@@ -53,19 +53,19 @@ func (m *InfoReq) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 		return b[:n], nil
 	}
 }
-func (m *InfoReq) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_InfoReq.Merge(m, src)
+func (m *InfoRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_InfoRequest.Merge(m, src)
 }
-func (m *InfoReq) XXX_Size() int {
+func (m *InfoRequest) XXX_Size() int {
 	return m.Size()
 }
-func (m *InfoReq) XXX_DiscardUnknown() {
-	xxx_messageInfo_InfoReq.DiscardUnknown(m)
+func (m *InfoRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_InfoRequest.DiscardUnknown(m)
 }
 
-var xxx_messageInfo_InfoReq proto.InternalMessageInfo
+var xxx_messageInfo_InfoRequest proto.InternalMessageInfo
 
-type InfoResp struct {
+type InfoResponse struct {
 	LabelSets     []labelpb.ZLabelSet `protobuf:"bytes,1,rep,name=label_sets,json=labelSets,proto3" json:"label_sets"`
 	ComponentType string              `protobuf:"bytes,2,opt,name=ComponentType,proto3" json:"ComponentType,omitempty"`
 	/// StoreInfo holds the metadata related to Store API if exposed by the component otherwise it will be null.
@@ -80,18 +80,18 @@ type InfoResp struct {
 	Exemplars *ExemplarsInfo `protobuf:"bytes,7,opt,name=exemplars,proto3" json:"exemplars,omitempty"`
 }
 
-func (m *InfoResp) Reset()         { *m = InfoResp{} }
-func (m *InfoResp) String() string { return proto.CompactTextString(m) }
-func (*InfoResp) ProtoMessage()    {}
-func (*InfoResp) Descriptor() ([]byte, []int) {
+func (m *InfoResponse) Reset()         { *m = InfoResponse{} }
+func (m *InfoResponse) String() string { return proto.CompactTextString(m) }
+func (*InfoResponse) ProtoMessage()    {}
+func (*InfoResponse) Descriptor() ([]byte, []int) {
 	return fileDescriptor_a1214ec45d2bf952, []int{1}
 }
-func (m *InfoResp) XXX_Unmarshal(b []byte) error {
+func (m *InfoResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
-func (m *InfoResp) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+func (m *InfoResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	if deterministic {
-		return xxx_messageInfo_InfoResp.Marshal(b, m, deterministic)
+		return xxx_messageInfo_InfoResponse.Marshal(b, m, deterministic)
 	} else {
 		b = b[:cap(b)]
 		n, err := m.MarshalToSizedBuffer(b)
@@ -101,17 +101,17 @@ func (m *InfoResp) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 		return b[:n], nil
 	}
 }
-func (m *InfoResp) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_InfoResp.Merge(m, src)
+func (m *InfoResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_InfoResponse.Merge(m, src)
 }
-func (m *InfoResp) XXX_Size() int {
+func (m *InfoResponse) XXX_Size() int {
 	return m.Size()
 }
-func (m *InfoResp) XXX_DiscardUnknown() {
-	xxx_messageInfo_InfoResp.DiscardUnknown(m)
+func (m *InfoResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_InfoResponse.DiscardUnknown(m)
 }
 
-var xxx_messageInfo_InfoResp proto.InternalMessageInfo
+var xxx_messageInfo_InfoResponse proto.InternalMessageInfo
 
 /// StoreInfo holds the metadata related to Store API exposed by the component.
 type StoreInfo struct {
@@ -303,46 +303,47 @@ func (m *ExemplarsInfo) XXX_DiscardUnknown() {
 var xxx_messageInfo_ExemplarsInfo proto.InternalMessageInfo
 
 func init() {
-	proto.RegisterType((*InfoReq)(nil), "thanos.InfoReq")
-	proto.RegisterType((*InfoResp)(nil), "thanos.InfoResp")
-	proto.RegisterType((*StoreInfo)(nil), "thanos.StoreInfo")
-	proto.RegisterType((*RulesInfo)(nil), "thanos.RulesInfo")
-	proto.RegisterType((*MetricMetadataInfo)(nil), "thanos.MetricMetadataInfo")
-	proto.RegisterType((*TargetsInfo)(nil), "thanos.TargetsInfo")
-	proto.RegisterType((*ExemplarsInfo)(nil), "thanos.ExemplarsInfo")
+	proto.RegisterType((*InfoRequest)(nil), "thanos.info.InfoRequest")
+	proto.RegisterType((*InfoResponse)(nil), "thanos.info.InfoResponse")
+	proto.RegisterType((*StoreInfo)(nil), "thanos.info.StoreInfo")
+	proto.RegisterType((*RulesInfo)(nil), "thanos.info.RulesInfo")
+	proto.RegisterType((*MetricMetadataInfo)(nil), "thanos.info.MetricMetadataInfo")
+	proto.RegisterType((*TargetsInfo)(nil), "thanos.info.TargetsInfo")
+	proto.RegisterType((*ExemplarsInfo)(nil), "thanos.info.ExemplarsInfo")
 }
 
 func init() { proto.RegisterFile("info/infopb/rpc.proto", fileDescriptor_a1214ec45d2bf952) }
 
 var fileDescriptor_a1214ec45d2bf952 = []byte{
-	// 418 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x9c, 0x92, 0x41, 0x6f, 0xd3, 0x30,
-	0x14, 0xc7, 0xe3, 0xb6, 0x4b, 0x96, 0x57, 0x95, 0x81, 0xd9, 0xa4, 0x2c, 0x87, 0x10, 0x45, 0x93,
-	0x28, 0x07, 0x1a, 0xb1, 0x49, 0xdc, 0xd9, 0xb4, 0x03, 0x12, 0xbb, 0x64, 0x3d, 0xed, 0x52, 0x39,
-	0xc3, 0x2b, 0x91, 0xe2, 0xd8, 0xc4, 0x46, 0x6a, 0xbf, 0x05, 0x1f, 0xab, 0xc7, 0x1e, 0x39, 0x21,
-	0x68, 0xbe, 0x08, 0xb2, 0x9d, 0x94, 0x46, 0xdc, 0xb8, 0x24, 0xcf, 0xff, 0xff, 0xff, 0x67, 0xbf,
-	0x27, 0x3d, 0x38, 0x2b, 0xaa, 0x27, 0x9e, 0xea, 0x8f, 0xc8, 0xd3, 0x5a, 0x3c, 0xce, 0x44, 0xcd,
-	0x15, 0xc7, 0xae, 0xfa, 0x42, 0x2a, 0x2e, 0xc3, 0x73, 0xa9, 0x78, 0x4d, 0xd3, 0x92, 0xe4, 0xb4,
-	0x14, 0x79, 0xaa, 0xd6, 0x82, 0x4a, 0x1b, 0x09, 0x4f, 0x97, 0x7c, 0xc9, 0x4d, 0x99, 0xea, 0xca,
-	0xaa, 0x89, 0x0f, 0xde, 0xc7, 0xea, 0x89, 0x67, 0xf4, 0x6b, 0xd2, 0x0c, 0xe0, 0xd8, 0xd6, 0x52,
-	0xe0, 0xf7, 0x00, 0xe6, 0x92, 0x85, 0xa4, 0x4a, 0x06, 0x28, 0x1e, 0x4e, 0xc7, 0x97, 0x2f, 0x66,
-	0xf6, 0x95, 0xd9, 0xc3, 0x27, 0x6d, 0xdd, 0x53, 0x75, 0x3d, 0xda, 0xfc, 0x7c, 0xe5, 0x64, 0x7e,
-	0xd9, 0x9e, 0x25, 0xbe, 0x80, 0xc9, 0x0d, 0x67, 0x82, 0x57, 0xb4, 0x52, 0xf3, 0xb5, 0xa0, 0xc1,
-	0x20, 0x46, 0x53, 0x3f, 0xeb, 0x8b, 0xf8, 0x35, 0x1c, 0x99, 0x46, 0x83, 0x61, 0x8c, 0x0e, 0x2f,
-	0xbe, 0xd7, 0xa2, 0xe9, 0xc1, 0xfa, 0x3a, 0x58, 0x7f, 0x2b, 0xa9, 0x0c, 0x46, 0xfd, 0x60, 0xa6,
-	0x45, 0x1b, 0x34, 0x3e, 0xbe, 0x81, 0x13, 0x46, 0x55, 0x5d, 0x3c, 0x2e, 0x18, 0x55, 0xe4, 0x33,
-	0x51, 0x24, 0x38, 0x32, 0x48, 0xd8, 0x21, 0x77, 0xc6, 0xbe, 0x6b, 0x5d, 0xc3, 0x3e, 0x63, 0x3d,
-	0x0d, 0xbf, 0x05, 0x4f, 0x91, 0x7a, 0xa9, 0x27, 0x76, 0x0d, 0xfc, 0xb2, 0x83, 0xe7, 0x56, 0x36,
-	0x54, 0x97, 0xc1, 0x57, 0xe0, 0xd3, 0x15, 0x65, 0xa2, 0x24, 0xb5, 0x0c, 0x3c, 0x03, 0x9c, 0x75,
-	0xc0, 0x6d, 0x67, 0x18, 0xe4, 0x6f, 0x2e, 0xf9, 0x00, 0xfe, 0x7e, 0x4a, 0x7c, 0x0e, 0xc7, 0xac,
-	0xa8, 0x16, 0xaa, 0x60, 0x34, 0x40, 0x31, 0x9a, 0x0e, 0x33, 0x8f, 0x15, 0xd5, 0xbc, 0x60, 0xd4,
-	0x58, 0x64, 0x65, 0xad, 0x41, 0x6b, 0x91, 0x95, 0xb6, 0x92, 0x31, 0xf8, 0xfb, 0xf9, 0x93, 0x53,
-	0xc0, 0xff, 0x4e, 0x96, 0x4c, 0x60, 0x7c, 0xd0, 0x72, 0x72, 0x0b, 0x93, 0x5e, 0x43, 0xff, 0xf7,
-	0xf0, 0xe5, 0x3b, 0x18, 0x19, 0xfa, 0x4d, 0xfb, 0x3f, 0xe9, 0xa6, 0x6d, 0x57, 0x28, 0x7c, 0xde,
-	0x17, 0xa4, 0xb8, 0xbe, 0xd8, 0xfc, 0x8e, 0x9c, 0xcd, 0x2e, 0x42, 0xdb, 0x5d, 0x84, 0x7e, 0xed,
-	0x22, 0xf4, 0xbd, 0x89, 0x9c, 0x6d, 0x13, 0x39, 0x3f, 0x9a, 0xc8, 0x79, 0x70, 0xed, 0x22, 0xe7,
-	0xae, 0x59, 0xc6, 0xab, 0x3f, 0x01, 0x00, 0x00, 0xff, 0xff, 0x1b, 0xb2, 0xd3, 0x29, 0xde, 0x02,
-	0x00, 0x00,
+	// 437 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x9c, 0x93, 0xcf, 0x6e, 0xd3, 0x40,
+	0x10, 0xc6, 0xed, 0x26, 0x4d, 0xf0, 0x98, 0x80, 0x58, 0x15, 0xb4, 0xc9, 0xc1, 0x8d, 0xac, 0x1e,
+	0x72, 0x40, 0xb6, 0x14, 0x24, 0x84, 0xc4, 0x89, 0x56, 0x95, 0x40, 0xa2, 0x17, 0x37, 0xa7, 0x5e,
+	0xa2, 0x4d, 0x99, 0x06, 0x4b, 0xde, 0x3f, 0x78, 0xb7, 0x52, 0x7a, 0xe3, 0x11, 0x78, 0xac, 0x1c,
+	0x7b, 0xe4, 0x84, 0x20, 0x79, 0x11, 0xb4, 0xbb, 0x6e, 0x89, 0x45, 0x4f, 0xbd, 0xd8, 0xbb, 0xfb,
+	0xfb, 0xbe, 0xd9, 0x99, 0xf1, 0x18, 0x5e, 0x96, 0xe2, 0x4a, 0xe6, 0xf6, 0xa1, 0x16, 0x79, 0xad,
+	0x2e, 0x33, 0x55, 0x4b, 0x23, 0x49, 0x6c, 0xbe, 0x32, 0x21, 0x75, 0x66, 0xc1, 0x68, 0xa8, 0x8d,
+	0xac, 0x31, 0xaf, 0xd8, 0x02, 0x2b, 0xb5, 0xc8, 0xcd, 0x8d, 0x42, 0xed, 0x75, 0xa3, 0x83, 0xa5,
+	0x5c, 0x4a, 0xb7, 0xcc, 0xed, 0xca, 0x9f, 0xa6, 0x03, 0x88, 0x3f, 0x89, 0x2b, 0x59, 0xe0, 0xb7,
+	0x6b, 0xd4, 0x26, 0xfd, 0xde, 0x81, 0xa7, 0x7e, 0xaf, 0x95, 0x14, 0x1a, 0xc9, 0x5b, 0x00, 0x17,
+	0x6c, 0xae, 0xd1, 0x68, 0x1a, 0x8e, 0x3b, 0x93, 0x78, 0xfa, 0x22, 0x6b, 0xae, 0xbc, 0xf8, 0x6c,
+	0xd1, 0x39, 0x9a, 0xe3, 0xee, 0xfa, 0xd7, 0x61, 0x50, 0x44, 0x55, 0xb3, 0xd7, 0xe4, 0x08, 0x06,
+	0x27, 0x92, 0x2b, 0x29, 0x50, 0x98, 0xd9, 0x8d, 0x42, 0xba, 0x37, 0x0e, 0x27, 0x51, 0xd1, 0x3e,
+	0x24, 0xaf, 0x61, 0xdf, 0x25, 0x4c, 0x3b, 0xe3, 0x70, 0x12, 0x4f, 0x5f, 0x65, 0x3b, 0xb5, 0x64,
+	0xe7, 0x96, 0xb8, 0x64, 0xbc, 0xc8, 0xaa, 0xeb, 0xeb, 0x0a, 0x35, 0xed, 0x3e, 0xa0, 0x2e, 0x2c,
+	0xf1, 0x6a, 0x27, 0x22, 0x1f, 0xe1, 0x39, 0x47, 0x53, 0x97, 0x97, 0x73, 0x8e, 0x86, 0x7d, 0x61,
+	0x86, 0xd1, 0x7d, 0xe7, 0x3b, 0x6c, 0xf9, 0xce, 0x9c, 0xe6, 0xac, 0x91, 0xb8, 0x00, 0xcf, 0x78,
+	0xeb, 0x8c, 0x4c, 0xa1, 0x6f, 0x58, 0xbd, 0xb4, 0x0d, 0xe8, 0xb9, 0x08, 0xb4, 0x15, 0x61, 0xe6,
+	0x99, 0xb3, 0xde, 0x09, 0xc9, 0x3b, 0x88, 0x70, 0x85, 0x5c, 0x55, 0xac, 0xd6, 0xb4, 0xef, 0x5c,
+	0xa3, 0x96, 0xeb, 0xf4, 0x8e, 0x3a, 0xdf, 0x3f, 0x71, 0xfa, 0x01, 0xa2, 0xfb, 0xca, 0xc9, 0x10,
+	0x9e, 0xf0, 0x52, 0xcc, 0x4d, 0xc9, 0x91, 0x86, 0xe3, 0x70, 0xd2, 0x29, 0xfa, 0xbc, 0x14, 0xb3,
+	0x92, 0xa3, 0x43, 0x6c, 0xe5, 0xd1, 0x5e, 0x83, 0xd8, 0xca, 0xa2, 0x34, 0x86, 0xe8, 0xbe, 0x1d,
+	0xe9, 0x01, 0x90, 0xff, 0x6b, 0xb4, 0xdf, 0x7d, 0x27, 0xef, 0xf4, 0x14, 0x06, 0xad, 0x84, 0x1e,
+	0x77, 0xf1, 0xf4, 0x04, 0xba, 0xce, 0xfd, 0xbe, 0x79, 0xb7, 0x1b, 0xb5, 0x33, 0x68, 0xa3, 0xe1,
+	0x03, 0xc4, 0x8f, 0xdc, 0xf1, 0xd1, 0xfa, 0x4f, 0x12, 0xac, 0x37, 0x49, 0x78, 0xbb, 0x49, 0xc2,
+	0xdf, 0x9b, 0x24, 0xfc, 0xb1, 0x4d, 0x82, 0xdb, 0x6d, 0x12, 0xfc, 0xdc, 0x26, 0xc1, 0x45, 0xcf,
+	0xff, 0x00, 0x8b, 0x9e, 0x9b, 0xdf, 0x37, 0x7f, 0x03, 0x00, 0x00, 0xff, 0xff, 0xc9, 0x9c, 0xd8,
+	0x20, 0x16, 0x03, 0x00, 0x00,
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -358,7 +359,7 @@ const _ = grpc.SupportPackageIsVersion4
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://godoc.org/google.golang.org/grpc#ClientConn.NewStream.
 type InfoClient interface {
 	/// Info returns the metadata (Eg. LabelSets, Min/Max time) about all the APIs the component supports.
-	Info(ctx context.Context, in *InfoReq, opts ...grpc.CallOption) (*InfoResp, error)
+	Info(ctx context.Context, in *InfoRequest, opts ...grpc.CallOption) (*InfoResponse, error)
 }
 
 type infoClient struct {
@@ -369,9 +370,9 @@ func NewInfoClient(cc *grpc.ClientConn) InfoClient {
 	return &infoClient{cc}
 }
 
-func (c *infoClient) Info(ctx context.Context, in *InfoReq, opts ...grpc.CallOption) (*InfoResp, error) {
-	out := new(InfoResp)
-	err := c.cc.Invoke(ctx, "/thanos.Info/Info", in, out, opts...)
+func (c *infoClient) Info(ctx context.Context, in *InfoRequest, opts ...grpc.CallOption) (*InfoResponse, error) {
+	out := new(InfoResponse)
+	err := c.cc.Invoke(ctx, "/thanos.info.Info/Info", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -381,14 +382,14 @@ func (c *infoClient) Info(ctx context.Context, in *InfoReq, opts ...grpc.CallOpt
 // InfoServer is the server API for Info service.
 type InfoServer interface {
 	/// Info returns the metadata (Eg. LabelSets, Min/Max time) about all the APIs the component supports.
-	Info(context.Context, *InfoReq) (*InfoResp, error)
+	Info(context.Context, *InfoRequest) (*InfoResponse, error)
 }
 
 // UnimplementedInfoServer can be embedded to have forward compatible implementations.
 type UnimplementedInfoServer struct {
 }
 
-func (*UnimplementedInfoServer) Info(ctx context.Context, req *InfoReq) (*InfoResp, error) {
+func (*UnimplementedInfoServer) Info(ctx context.Context, req *InfoRequest) (*InfoResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Info not implemented")
 }
 
@@ -397,7 +398,7 @@ func RegisterInfoServer(s *grpc.Server, srv InfoServer) {
 }
 
 func _Info_Info_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(InfoReq)
+	in := new(InfoRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -406,16 +407,16 @@ func _Info_Info_Handler(srv interface{}, ctx context.Context, dec func(interface
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/thanos.Info/Info",
+		FullMethod: "/thanos.info.Info/Info",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(InfoServer).Info(ctx, req.(*InfoReq))
+		return srv.(InfoServer).Info(ctx, req.(*InfoRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 var _Info_serviceDesc = grpc.ServiceDesc{
-	ServiceName: "thanos.Info",
+	ServiceName: "thanos.info.Info",
 	HandlerType: (*InfoServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
@@ -427,7 +428,7 @@ var _Info_serviceDesc = grpc.ServiceDesc{
 	Metadata: "info/infopb/rpc.proto",
 }
 
-func (m *InfoReq) Marshal() (dAtA []byte, err error) {
+func (m *InfoRequest) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalToSizedBuffer(dAtA[:size])
@@ -437,12 +438,12 @@ func (m *InfoReq) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *InfoReq) MarshalTo(dAtA []byte) (int, error) {
+func (m *InfoRequest) MarshalTo(dAtA []byte) (int, error) {
 	size := m.Size()
 	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
-func (m *InfoReq) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+func (m *InfoRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	i := len(dAtA)
 	_ = i
 	var l int
@@ -450,7 +451,7 @@ func (m *InfoReq) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 
-func (m *InfoResp) Marshal() (dAtA []byte, err error) {
+func (m *InfoResponse) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalToSizedBuffer(dAtA[:size])
@@ -460,12 +461,12 @@ func (m *InfoResp) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *InfoResp) MarshalTo(dAtA []byte) (int, error) {
+func (m *InfoResponse) MarshalTo(dAtA []byte) (int, error) {
 	size := m.Size()
 	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
-func (m *InfoResp) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+func (m *InfoResponse) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	i := len(dAtA)
 	_ = i
 	var l int
@@ -700,7 +701,7 @@ func encodeVarintRpc(dAtA []byte, offset int, v uint64) int {
 	dAtA[offset] = uint8(v)
 	return base
 }
-func (m *InfoReq) Size() (n int) {
+func (m *InfoRequest) Size() (n int) {
 	if m == nil {
 		return 0
 	}
@@ -709,7 +710,7 @@ func (m *InfoReq) Size() (n int) {
 	return n
 }
 
-func (m *InfoResp) Size() (n int) {
+func (m *InfoResponse) Size() (n int) {
 	if m == nil {
 		return 0
 	}
@@ -811,7 +812,7 @@ func sovRpc(x uint64) (n int) {
 func sozRpc(x uint64) (n int) {
 	return sovRpc(uint64((x << 1) ^ uint64((int64(x) >> 63))))
 }
-func (m *InfoReq) Unmarshal(dAtA []byte) error {
+func (m *InfoRequest) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -834,10 +835,10 @@ func (m *InfoReq) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: InfoReq: wiretype end group for non-group")
+			return fmt.Errorf("proto: InfoRequest: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: InfoReq: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: InfoRequest: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		default:
@@ -861,7 +862,7 @@ func (m *InfoReq) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *InfoResp) Unmarshal(dAtA []byte) error {
+func (m *InfoResponse) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -884,10 +885,10 @@ func (m *InfoResp) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: InfoResp: wiretype end group for non-group")
+			return fmt.Errorf("proto: InfoResponse: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: InfoResp: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: InfoResponse: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:

@@ -667,7 +667,7 @@ func (s *StoreSet) getActiveStores(ctx context.Context, stores map[string]*store
 				}
 			}
 
-			info, err := st.info.Info(ctx, &infopb.InfoReq{}, grpc.WaitForReady(true))
+			info, err := st.info.Info(ctx, &infopb.InfoRequest{}, grpc.WaitForReady(true))
 			if err != nil {
 				if !seenAlready {
 					// Close only if new

@@ -132,10 +132,10 @@ func (s *testStores) CloseOne(addr string) {
 }
 
 type mockedInfo struct {
-	info infopb.InfoResp
+	info infopb.InfoResponse
 }
 
-func (s *mockedInfo) Info(ctx context.Context, r *infopb.InfoReq) (*infopb.InfoResp, error) {
+func (s *mockedInfo) Info(ctx context.Context, r *infopb.InfoRequest) (*infopb.InfoResponse, error) {
 	return &s.info, nil
 }
 
@@ -160,6 +160,7 @@ func startInfoSrvs(infoMetas []testInfoMeta) (*testInfoSrvs, error) {
 	}
 
 	for _, meta := range infoMetas {
+		meta := meta
 		listener, err := net.Listen("tcp", "127.0.0.1:0")
 		if err != nil {
 			// Close the servers
@@ -170,7 +171,7 @@ func startInfoSrvs(infoMetas []testInfoMeta) (*testInfoSrvs, error) {
 		srv := grpc.NewServer()
 
 		infoSrv := &mockedInfo{
-			info: infopb.InfoResp{
+			info: infopb.InfoResponse{
 				LabelSets:      meta.extlsetFn(listener.Addr().String()),
 				Store:          &meta.store,
 				MetricMetadata: &meta.metadata,
