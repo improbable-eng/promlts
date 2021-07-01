@@ -8,8 +8,9 @@ import "store/storepb/types.proto";
 import "store/labelpb/types.proto";
 import "gogoproto/gogo.proto";
 import "google/protobuf/timestamp.proto";
+import "google/api/annotations.proto";
 
-option go_package = "rulespb";
+option go_package = "./;rulespb";
 
 option (gogoproto.sizer_all) = true;
 option (gogoproto.marshaler_all) = true;
@@ -26,7 +27,30 @@ option (gogoproto.goproto_sizecache_all) = false;
 service Rules {
     /// Rules has info for all rules.
     /// Returned rules are expected to include external labels.
-    rpc Rules(RulesRequest) returns (stream RulesResponse);
+    rpc Rules(RulesRequest) returns (stream RulesResponse){};
+
+    /// Gets a rule recording.
+    rpc RulesRecord(RuleRecordRequest) returns (RecordingRule){
+        option (google.api.http) = { get: "rules" };
+    }
+
+    /// Gets a rule alerting.
+    rpc RulesAlert(RuleAlertRequest) returns (Alert){
+        option (google.api.http) = { get: "alerts" };
+    }
+
+}
+
+/// Request message for recording rules.
+message RuleRecordRequest {
+    /// The type to request.
+    RulesRequest.Type type = 1 ;
+}
+
+/// Request message for alerting rules.
+message RuleAlertRequest {
+    /// The type to request.
+    RulesRequest.Type type = 1 ;
 }
 
 message RulesRequest {

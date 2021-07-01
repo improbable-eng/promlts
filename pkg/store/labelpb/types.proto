@@ -4,7 +4,7 @@
 syntax = "proto3";
 package thanos;
 
-option go_package = "labelpb";
+option go_package = "labelpb/;labelpb";
 
 import "gogoproto/gogo.proto";
 
