@@ -6,18 +6,22 @@ package http
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"net/http"
 	"net/url"
 	"path"
 	"sync"
+	"time"
 
 	"github.com/go-kit/kit/log"
+	"github.com/mwitkow/go-conntrack"
 	config_util "github.com/prometheus/common/config"
 	"github.com/prometheus/common/model"
 	"github.com/prometheus/common/version"
 	"github.com/prometheus/prometheus/discovery/file"
 	"github.com/prometheus/prometheus/discovery/targetgroup"
+	"golang.org/x/net/http2"
 	"gopkg.in/yaml.v2"
 
 	"github.com/thanos-io/thanos/pkg/discovery/cache"
@@ -35,6 +39,8 @@ type ClientConfig struct {
 	ProxyURL string `yaml:"proxy_url"`
 	// TLSConfig to use to connect to the targets.
 	TLSConfig TLSConfig `yaml:"tls_config"`
+	// TransportConfig for Client transport properties
+	TransportConfig TransportConfig `yaml:"transport_config"`
 }
 
 // TLSConfig configures TLS connections.
@@ -61,6 +67,104 @@ type BasicAuth struct {
 // IsZero returns false if basic authentication isn't enabled.
 func (b BasicAuth) IsZero() bool {
 	return b.Username == "" && b.Password == "" && b.PasswordFile == ""
+}
+
+// Transport configures client's transport properties.
+type TransportConfig struct {
+	MaxIdleConns          int  `yaml:"max_idle_conns"`
+	MaxIdleConnsPerHost   int  `yaml:"max_idle_conns_per_host"`
+	IdleConnTimeout       int  `yaml:"idle_conn_timeout"`
+	ResponseHeaderTimeout int  `yaml:"response_header_timeout"`
+	ExpectContinueTimeout int  `yaml:"expect_continue_timeout"`
+	MaxConnsPerHost       int  `yaml:"max_conns_per_host"`
+	DisableCompression    bool `yaml:"disable_compression"`
+	TLSHandshakeTimeout   int  `yaml:"tls_handshake_timeout"`
+}
+
+var defaultTransportConfig TransportConfig = TransportConfig{
+	MaxIdleConns:          100,
+	MaxIdleConnsPerHost:   2,
+	ResponseHeaderTimeout: 0,
+	MaxConnsPerHost:       0,
+	IdleConnTimeout:       int(90 * time.Second),
+	ExpectContinueTimeout: int(10 * time.Second),
+	DisableCompression:    false,
+	TLSHandshakeTimeout:   int(10 * time.Second),
+}
+
+func NewClientConfigFromYAML(cfg []byte) (*ClientConfig, error) {
+	conf := &ClientConfig{TransportConfig: defaultTransportConfig}
+	if err := yaml.Unmarshal(cfg, conf); err != nil {
+		return nil, err
+	}
+	return conf, nil
+}
+
+// NewRoundTripperFromConfig returns a new HTTP RoundTripper configured for the
+// given http.HTTPClientConfig and http.HTTPClientOption.
+func NewRoundTripperFromConfig(cfg config_util.HTTPClientConfig, transportConfig TransportConfig, name string) (http.RoundTripper, error) {
+	newRT := func(tlsConfig *tls.Config) (http.RoundTripper, error) {
+		var rt http.RoundTripper = &http.Transport{
+			Proxy:                 http.ProxyURL(cfg.ProxyURL.URL),
+			MaxIdleConns:          transportConfig.MaxIdleConns,
+			MaxIdleConnsPerHost:   transportConfig.MaxIdleConnsPerHost,
+			MaxConnsPerHost:       transportConfig.MaxConnsPerHost,
+			TLSClientConfig:       tlsConfig,
+			DisableCompression:    transportConfig.DisableCompression,
+			IdleConnTimeout:       time.Duration(transportConfig.IdleConnTimeout),
+			ResponseHeaderTimeout: time.Duration(transportConfig.ResponseHeaderTimeout),
+			ExpectContinueTimeout: time.Duration(transportConfig.ExpectContinueTimeout),
+			TLSHandshakeTimeout:   time.Duration(transportConfig.TLSHandshakeTimeout),
+			DialContext: conntrack.NewDialContextFunc(
+				conntrack.DialWithTracing(),
+				conntrack.DialWithName(name)),
+		}
+
+		// HTTP/2 support is golang has many problematic cornercases where
+		// dead connections would be kept and used in connection pools.
+		// https://github.com/golang/go/issues/32388
+		// https://github.com/golang/go/issues/39337
+		// https://github.com/golang/go/issues/39750
+		// TODO: Re-Enable HTTP/2 once upstream issue is fixed.
+		// TODO: use ForceAttemptHTTP2 when we move to Go 1.13+.
+		err := http2.ConfigureTransport(rt.(*http.Transport))
+		if err != nil {
+			return nil, err
+		}
+
+		// If a authorization_credentials is provided, create a round tripper that will set the
+		// Authorization header correctly on each request.
+		if cfg.Authorization != nil && len(cfg.Authorization.Credentials) > 0 {
+			rt = config_util.NewAuthorizationCredentialsRoundTripper(cfg.Authorization.Type, cfg.Authorization.Credentials, rt)
+		} else if cfg.Authorization != nil && len(cfg.Authorization.CredentialsFile) > 0 {
+			rt = config_util.NewAuthorizationCredentialsFileRoundTripper(cfg.Authorization.Type, cfg.Authorization.CredentialsFile, rt)
+		}
+		// Backwards compatibility, be nice with importers who would not have
+		// called Validate().
+		if len(cfg.BearerToken) > 0 {
+			rt = config_util.NewAuthorizationCredentialsRoundTripper("Bearer", cfg.BearerToken, rt)
+		} else if len(cfg.BearerTokenFile) > 0 {
+			rt = config_util.NewAuthorizationCredentialsFileRoundTripper("Bearer", cfg.BearerTokenFile, rt)
+		}
+
+		if cfg.BasicAuth != nil {
+			rt = config_util.NewBasicAuthRoundTripper(cfg.BasicAuth.Username, cfg.BasicAuth.Password, cfg.BasicAuth.PasswordFile, rt)
+		}
+		// Return a new configured RoundTripper.
+		return rt, nil
+	}
+
+	tlsConfig, err := config_util.NewTLSConfig(&cfg.TLSConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(cfg.TLSConfig.CAFile) == 0 {
+		// No need for a RoundTripper that reloads the CA file automatically.
+		return newRT(tlsConfig)
+	}
+
+	return config_util.NewTLSRoundTripper(tlsConfig, cfg.TLSConfig.CAFile, newRT)
 }
 
 // NewHTTPClient returns a new HTTP client.
@@ -91,15 +195,31 @@ func NewHTTPClient(cfg ClientConfig, name string) (*http.Client, error) {
 			PasswordFile: cfg.BasicAuth.PasswordFile,
 		}
 	}
+
+	if cfg.BearerToken != "" {
+		httpClientConfig.BearerToken = config_util.Secret(cfg.BearerToken)
+	}
+
+	if cfg.BearerTokenFile != "" {
+		httpClientConfig.BearerTokenFile = cfg.BearerTokenFile
+	}
+
 	if err := httpClientConfig.Validate(); err != nil {
 		return nil, err
 	}
 
-	client, err := config_util.NewClientFromConfig(httpClientConfig, name, config_util.WithHTTP2Disabled())
+	rt, err := NewRoundTripperFromConfig(
+		httpClientConfig,
+		cfg.TransportConfig,
+		name,
+	)
 	if err != nil {
 		return nil, err
 	}
-	client.Transport = &userAgentRoundTripper{name: ThanosUserAgent, rt: client.Transport}
+
+	rt = &userAgentRoundTripper{name: ThanosUserAgent, rt: rt}
+	client := &http.Client{Transport: rt}
+
 	return client, nil
 }
 

@@ -697,3 +697,64 @@ func NewToolsBucketWeb(name string, bucketConfig client.BucketConfig, routePrefi
 
 	return toolsBucketWeb, nil
 }
+
+func NewPrometheusAndSidecarWithBasicAuth(sharedDir string, netName string, name string, promConfig, webConfig, promImage string) (*e2e.HTTPService, *Service, error) {
+	dir := filepath.Join(sharedDir, "data", "prometheus", name)
+	container := filepath.Join(e2e.ContainerSharedDir, "data", "prometheus", name)
+	if err := os.MkdirAll(dir, 0777); err != nil {
+		return nil, nil, errors.Wrap(err, "create prometheus dir")
+	}
+
+	if err := ioutil.WriteFile(filepath.Join(dir, "prometheus.yml"), []byte(promConfig), 0666); err != nil {
+		return nil, nil, errors.Wrap(err, "creating prom config failed")
+	}
+
+	if err := ioutil.WriteFile(filepath.Join(dir, "web-config.yml"), []byte(webConfig), 0666); err != nil {
+		return nil, nil, errors.Wrap(err, "creating web-config failed")
+	}
+
+	args := e2e.BuildArgs(map[string]string{
+		"--config.file":                     filepath.Join(container, "prometheus.yml"),
+		"--storage.tsdb.path":               container,
+		"--storage.tsdb.max-block-duration": "2h",
+		"--log.level":                       infoLogLevel,
+		"--web.listen-address":              ":9090",
+		"--web.config.file":                 filepath.Join(container, "web-config.yml"),
+	})
+	prom := e2e.NewHTTPService(
+		fmt.Sprintf("prometheus-%s", name),
+		promImage,
+		e2e.NewCommandWithoutEntrypoint("prometheus", args...),
+		e2e.NewHTTPReadinessProbe(9090, "/-/ready", 200, 200),
+		9090,
+	)
+	prom.SetUser(strconv.Itoa(os.Getuid()))
+	prom.SetBackoff(defaultBackoffConfig)
+
+	args = e2e.BuildArgs(map[string]string{
+		"--debug.name":        fmt.Sprintf("sidecar-%v", name),
+		"--grpc-address":      ":9091",
+		"--grpc-grace-period": "0s",
+		"--http-address":      ":8080",
+		"--prometheus.url":    "http://" + prom.NetworkEndpointFor(netName, 9090),
+		"--tsdb.path":         container,
+		"--log.level":         infoLogLevel,
+		"--prometheus.http-client": `
+basic_auth:
+  username: test
+  password: test
+`,
+	})
+	sidecar := NewService(
+		fmt.Sprintf("sidecar-%s", name),
+		DefaultImage(),
+		e2e.NewCommand("sidecar", args...),
+		e2e.NewHTTPReadinessProbe(8080, "/-/ready", 200, 200),
+		8080,
+		9091,
+	)
+	sidecar.SetUser(strconv.Itoa(os.Getuid()))
+	sidecar.SetBackoff(defaultBackoffConfig)
+
+	return prom, sidecar, nil
+}

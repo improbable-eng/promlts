@@ -94,3 +94,12 @@ func RegisterSelectorRelabelFlags(cmd FlagClause) *extflag.PathOrContent {
 		extflag.WithEnvSubstitution(),
 	)
 }
+
+func RegisterHTTPConfigFlags(cmd FlagClause) *extflag.PathOrContent {
+	return extflag.RegisterPathOrContent(
+		cmd,
+		"prometheus.http-client",
+		"YAML file or string with http client configs. see Format details : ...",
+		false,
+	)
+}

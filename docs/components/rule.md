@@ -437,6 +437,15 @@ alertmanagers:
       key_file: ""
       server_name: ""
       insecure_skip_verify: false
+    transport_config:
+      max_idle_conns: 0
+      max_idle_conns_per_host: 0
+      idle_conn_timeout: 0
+      response_header_timeout: 0
+      expect_continue_timeout: 0
+      max_conns_per_host: 0
+      disable_compression: false
+      tls_handshake_timeout: 0
   static_configs: []
   file_sd_configs:
   - files: []
@@ -470,6 +479,15 @@ The configuration format is the following:
       key_file: ""
       server_name: ""
       insecure_skip_verify: false
+    transport_config:
+      max_idle_conns: 0
+      max_idle_conns_per_host: 0
+      idle_conn_timeout: 0
+      response_header_timeout: 0
+      expect_continue_timeout: 0
+      max_conns_per_host: 0
+      disable_compression: false
+      tls_handshake_timeout: 0
   static_configs: []
   file_sd_configs:
   - files: []

@@ -65,6 +65,7 @@ func (hc *httpConfig) registerFlag(cmd extkingpin.FlagClause) *httpConfig {
 type prometheusConfig struct {
 	url          *url.URL
 	readyTimeout time.Duration
+	httpClient   *extflag.PathOrContent
 }
 
 func (pc *prometheusConfig) registerFlag(cmd extkingpin.FlagClause) *prometheusConfig {
@@ -74,22 +75,8 @@ func (pc *prometheusConfig) registerFlag(cmd extkingpin.FlagClause) *prometheusC
 	cmd.Flag("prometheus.ready_timeout",
 		"Maximum time to wait for the Prometheus instance to start up").
 		Default("10m").DurationVar(&pc.readyTimeout)
+	pc.httpClient = extkingpin.RegisterHTTPConfigFlags(cmd)
 	return pc
-}
-
-type connConfig struct {
-	maxIdleConns        int
-	maxIdleConnsPerHost int
-}
-
-func (cc *connConfig) registerFlag(cmd extkingpin.FlagClause) *connConfig {
-	cmd.Flag("receive.connection-pool-size",
-		"Controls the http MaxIdleConns. Default is 0, which is unlimited").
-		IntVar(&cc.maxIdleConns)
-	cmd.Flag("receive.connection-pool-size-per-host",
-		"Controls the http MaxIdleConnsPerHost").
-		Default("100").IntVar(&cc.maxIdleConnsPerHost)
-	return cc
 }
 
 type tsdbConfig struct {

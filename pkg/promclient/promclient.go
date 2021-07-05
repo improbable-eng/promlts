@@ -31,6 +31,7 @@ import (
 	"github.com/prometheus/prometheus/promql"
 	"github.com/prometheus/prometheus/promql/parser"
 	"github.com/thanos-io/thanos/pkg/exemplars/exemplarspb"
+	thanoshttp "github.com/thanos-io/thanos/pkg/http"
 	"github.com/thanos-io/thanos/pkg/metadata/metadatapb"
 	"github.com/thanos-io/thanos/pkg/rules/rulespb"
 	"github.com/thanos-io/thanos/pkg/runutil"
@@ -83,18 +84,19 @@ func NewClient(c HTTPClient, logger log.Logger, userAgent string) *Client {
 
 // NewDefaultClient returns Client with tracing tripperware.
 func NewDefaultClient() *Client {
+	client, _ := thanoshttp.NewHTTPClient(thanoshttp.ClientConfig{}, "")
 	return NewWithTracingClient(
 		log.NewNopLogger(),
+		client,
 		"",
 	)
 }
 
 // NewWithTracingClient returns client with tracing tripperware.
-func NewWithTracingClient(logger log.Logger, userAgent string) *Client {
+func NewWithTracingClient(logger log.Logger, httpClient *http.Client, userAgent string) *Client {
+	httpClient.Transport = tracing.HTTPTripperware(log.NewNopLogger(), httpClient.Transport)
 	return NewClient(
-		&http.Client{
-			Transport: tracing.HTTPTripperware(log.NewNopLogger(), http.DefaultTransport),
-		},
+		httpClient,
 		logger,
 		userAgent,
 	)
@@ -120,7 +122,6 @@ func (c *Client) req2xx(ctx context.Context, u *url.URL, method string) (_ []byt
 	if method == http.MethodPost {
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	}
-
 	resp, err := c.Do(req.WithContext(ctx))
 	if err != nil {
 		return nil, 0, errors.Wrapf(err, "perform %s request against %s", method, u.String())

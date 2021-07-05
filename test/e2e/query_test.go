@@ -85,6 +85,14 @@ rule_files:
 	return config
 }
 
+func defaultWebConfig() string {
+	// username: test, secret: test(bcrypt hash)
+	return `
+basic_auth_users:
+  test: $2y$10$IsC9GG9U61sPCuDwwwcnPuMRyzx62cIcdNRs4SIdKwgWihfX4IC.C
+`
+}
+
 func sortResults(res model.Vector) {
 	sort.Slice(res, func(i, j int) bool {
 		return res[i].String() < res[j].String()
@@ -338,6 +346,37 @@ func TestQueryLabelValues(t *testing.T) {
 			return len(res) == 0
 		},
 	)
+}
+
+func TestQueryWithAuthorizedSidecar(t *testing.T) {
+	t.Parallel()
+
+	s, err := e2e.NewScenario("e2e_test_query_authorized_sidecar")
+	testutil.Ok(t, err)
+	t.Cleanup(e2ethanos.CleanScenario(t, s))
+
+	prom, sidecar, err := e2ethanos.NewPrometheusAndSidecarWithBasicAuth(s.SharedDir(), s.NetworkName(), "alone", defaultPromConfig("prom-alone", 0, "", ""), defaultWebConfig(), e2ethanos.DefaultPrometheusImage())
+	testutil.Ok(t, err)
+	_ = s.StartAndWaitReady(prom, sidecar)
+
+	q, err := e2ethanos.NewQuerierBuilder(s.SharedDir(), "1", []string{sidecar.GRPCNetworkEndpoint()}).Build()
+	testutil.Ok(t, err)
+	testutil.Ok(t, s.StartAndWaitReady(q))
+
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+	t.Cleanup(cancel)
+
+	testutil.Ok(t, q.WaitSumMetricsWithOptions(e2e.Equals(1), []string{"thanos_store_nodes_grpc_connections"}))
+
+	queryAndAssertSeries(t, ctx, q.HTTPEndpoint(), queryUpWithoutInstance, promclient.QueryOptions{
+		Deduplicate: false,
+	}, []model.Metric{
+		{
+			"job":        "myself",
+			"prometheus": "prom-alone",
+			"replica":    "0",
+		},
+	})
 }
 
 func checkNetworkRequests(t *testing.T, addr string) {

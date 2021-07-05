@@ -85,6 +85,7 @@ import (
 type Reloader struct {
 	logger        log.Logger
 	reloadURL     *url.URL
+	HTTPClient    http.Client
 	cfgFile       string
 	cfgOutputFile string
 	watchInterval time.Duration
@@ -395,7 +396,7 @@ func (r *Reloader) triggerReload(ctx context.Context) error {
 	}
 	req = req.WithContext(ctx)
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := r.HTTPClient.Do(req)
 	if err != nil {
 		return errors.Wrap(err, "reload request failed")
 	}
