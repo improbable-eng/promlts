@@ -2,7 +2,7 @@
 // Licensed under the Apache License 2.0.
 
 syntax = "proto3";
-package thanos;
+package thanos.info;
 
 import "store/labelpb/types.proto";
 import "gogoproto/gogo.proto";
