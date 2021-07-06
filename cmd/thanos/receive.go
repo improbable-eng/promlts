@@ -123,16 +123,21 @@ func runReceive(
 		return err
 	}
 
+	var TLSConfig store.TLSConfiguration
+	TLSConfig.CertFile = conf.rwClientCert
+	TLSConfig.KeyFile = conf.rwClientKey
+	TLSConfig.CaCertFile = conf.rwClientServerCA
+	TLSConfig.ServerName = conf.rwClientServerName
+
 	dialOpts, err := extgrpc.StoreClientGRPCOpts(
 		logger,
 		reg,
 		tracer,
 		*conf.grpcCert != "",
 		*conf.grpcClientCA == "",
-		conf.rwClientCert,
-		conf.rwClientKey,
-		conf.rwClientServerCA,
-		conf.rwClientServerName,
+		conf.rwServerCert != "",
+		conf.rwServerClientCA == "",
+		TLSConfig,
 	)
 	if err != nil {
 		return err

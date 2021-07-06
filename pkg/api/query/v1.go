@@ -94,7 +94,7 @@ type QueryAPI struct {
 	disableCORS                         bool
 
 	replicaLabels []string
-	storeSet      *query.StoreSet
+	storeSets     []*query.StoreSet
 
 	defaultRangeQueryStep                  time.Duration
 	defaultInstantQueryMaxSourceResolution time.Duration
@@ -106,7 +106,7 @@ type QueryAPI struct {
 // NewQueryAPI returns an initialized QueryAPI type.
 func NewQueryAPI(
 	logger log.Logger,
-	storeSet *query.StoreSet,
+	storeSets []*query.StoreSet,
 	qe func(int64) *promql.Engine,
 	c query.QueryableCreator,
 	ruleGroups rules.UnaryClient,
@@ -144,7 +144,7 @@ func NewQueryAPI(
 		enableTargetPartialResponse:            enableTargetPartialResponse,
 		enableMetricMetadataPartialResponse:    enableMetricMetadataPartialResponse,
 		replicaLabels:                          replicaLabels,
-		storeSet:                               storeSet,
+		storeSets:                              storeSets,
 		defaultRangeQueryStep:                  defaultRangeQueryStep,
 		defaultInstantQueryMaxSourceResolution: defaultInstantQueryMaxSourceResolution,
 		defaultMetadataTimeRange:               defaultMetadataTimeRange,
@@ -702,8 +702,10 @@ func (qapi *QueryAPI) labelNames(r *http.Request) (interface{}, []error, *api.Ap
 
 func (qapi *QueryAPI) stores(_ *http.Request) (interface{}, []error, *api.ApiError) {
 	statuses := make(map[string][]query.StoreStatus)
-	for _, status := range qapi.storeSet.GetStoreStatus() {
-		statuses[status.StoreType.String()] = append(statuses[status.StoreType.String()], status)
+	for _, storesSet := range qapi.storeSets {
+		for _, status := range storesSet.GetStoreStatus() {
+			statuses[status.StoreType.String()] = append(statuses[status.StoreType.String()], status)
+		}
 	}
 	return statuses, nil, nil
 }
