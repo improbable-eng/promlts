@@ -24,11 +24,6 @@ import (
 	"github.com/thanos-io/thanos/pkg/testutil"
 )
 
-var testGRPCOpts = []grpc.DialOption{
-	grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(math.MaxInt32)),
-	grpc.WithInsecure(),
-}
-
 type mockedStore struct {
 	infoDelay time.Duration
 	info      storepb.InfoResponse
@@ -1014,20 +1009,6 @@ func TestStoreSet_Rules_Discovery(t *testing.T) {
 			}
 		})
 	}
-}
-
-type errThatMarshalsToEmptyDict struct {
-	msg string
-}
-
-// MarshalJSON marshals the error and returns and empty dict, not the error string.
-func (e *errThatMarshalsToEmptyDict) MarshalJSON() ([]byte, error) {
-	return json.Marshal(map[string]string{})
-}
-
-// Error returns the original, underlying string.
-func (e *errThatMarshalsToEmptyDict) Error() string {
-	return e.msg
 }
 
 // Test highlights that without wrapping the error, it is marshaled to empty dict {}, not its message.

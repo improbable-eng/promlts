@@ -32,6 +32,10 @@ import (
 
 const (
 	unhealthyEndpointMessage = "removing endpoint because it's unhealthy or does not exist"
+
+	// Default minimum and maximum time values used by Prometheus when they are not passed as query parameter.
+	MinTime = -9223309901257974
+	MaxTime = 9223309901257974
 )
 
 type EndpointSpec interface {
@@ -55,8 +59,8 @@ type grpcEndpointSpec struct {
 
 // NewGRPCEndpointSpec creates gRPC endpoint spec.
 // It uses InfoAPI to get Metadata.
-func NewGRPCEndpointSpec(addr string, strictstatic bool) StoreSpec {
-	return &grpcStoreSpec{addr: addr, strictstatic: strictstatic}
+func NewGRPCEndpointSpec(addr string, strictstatic bool) EndpointSpec {
+	return &grpcEndpointSpec{addr: addr, strictstatic: strictstatic}
 }
 
 // StrictStatic returns true if the endpoint has been statically defined and it is under a strict mode.
@@ -74,10 +78,12 @@ func (es *grpcEndpointSpec) Addr() string {
 func (es *grpcEndpointSpec) Metadata(ctx context.Context, client infopb.InfoClient) (metadata *endpointMetadata, err error) {
 	resp, err := client.Info(ctx, &infopb.InfoRequest{}, grpc.WaitForReady(true))
 	if err != nil {
-		return nil, errors.Wrapf(err, "fetching info from %s", es.addr)
+		return &endpointMetadata{&infopb.InfoResponse{
+			ComponentType: component.UnknownStoreAPI.String(),
+		}}, errors.Wrapf(err, "fetching info from %s", es.addr)
 	}
 
-	return &endpointMetadata{*resp}, nil
+	return &endpointMetadata{resp}, nil
 }
 
 // stringError forces the error to be a string
@@ -218,6 +224,7 @@ func NewEndpointSet(
 		endpoints:                make(map[string]*endpointRef),
 		endpointStatuses:         make(map[string]*EndpointStatus),
 		unhealthyEndpointTimeout: unhealthyStoreTimeout,
+		endpointSpec:             endpointSpecs,
 	}
 	return es
 }
@@ -251,7 +258,7 @@ func (e *EndpointSet) Update(ctx context.Context) {
 
 		er.Close()
 		delete(endpoints, addr)
-		e.updateEndpointStatus(er, errors.New(unhealthyStoreMessage))
+		e.updateEndpointStatus(er, errors.New(unhealthyEndpointMessage))
 		level.Info(er.logger).Log("msg", unhealthyEndpointMessage, "address", addr, "extLset", labelpb.PromLabelSetsToString(er.LabelSets()))
 	}
 
@@ -265,8 +272,8 @@ func (e *EndpointSet) Update(ctx context.Context) {
 
 		// All producers should have unique external labels. While this does not check only StoreAPIs connected to
 		// this querier this allows to notify early user about misconfiguration. Warn only. This is also detectable from metric.
-		if er.ComponentType() != nil &&
-			(er.ComponentType() == component.Sidecar || er.ComponentType() == component.Rule) &&
+		if (er.ComponentType() != nil &&
+			(er.ComponentType() == component.Sidecar || er.ComponentType() == component.Rule)) &&
 			stats[component.Sidecar][extLset]+stats[component.Rule][extLset] > 0 {
 
 			level.Warn(e.logger).Log("msg", "found duplicate storeAPI producer (sidecar or ruler). This is not advices as it will malform data in in the same bucket",
@@ -417,7 +424,7 @@ func (e *EndpointSet) getActiveEndpoints(ctx context.Context, endpoints map[stri
 
 			er, seenAlready := endpoints[addr]
 			if !seenAlready {
-				// New store or was unactive and was removed in the past - create the new one.
+				// New endpoint or was unactive and was removed in the past - create the new one.
 				conn, err := grpc.DialContext(ctx, addr, e.dialOpts...)
 				if err != nil {
 					e.updateEndpointStatus(&endpointRef{addr: addr}, err)
@@ -426,25 +433,44 @@ func (e *EndpointSet) getActiveEndpoints(ctx context.Context, endpoints map[stri
 				}
 
 				er = &endpointRef{
-					cc:      conn,
-					addr:    addr,
-					logger:  e.logger,
-					clients: NewEndpointClients(InfoClient(infopb.NewInfoClient(conn))),
+					cc:     conn,
+					addr:   addr,
+					logger: e.logger,
+					clients: &endpointClients{
+						info: infopb.NewInfoClient(conn),
+					},
 				}
 			}
 
-			// info, err := er.info.Info(ctx, &infopb.InfoRequest{}, grpc.WaitForReady(true))
 			metadata, err := spec.Metadata(ctx, er.clients.info)
 			if err != nil {
-				if !seenAlready {
-					// Close only if new
-					// Unactive `s.stores` will be closed later on.
+				if !seenAlready && !spec.StrictStatic() {
+					// Close only if new and not a strict static node.
+					// Unactive `e.endpoints` will be closed later on.
 					er.Close()
 				}
 
 				e.updateEndpointStatus(er, err)
 				level.Warn(e.logger).Log("msg", "update of node failed", "err", errors.Wrap(err, "getting metadata"), "address", addr)
 
+				if !spec.StrictStatic() {
+					return
+				}
+
+				// Still keep it around if static & strict mode enabled.
+				// Assume that it expose storeAPI and cover all complete possible time range.
+				if !seenAlready {
+					metadata.Store = &infopb.StoreInfo{
+						MinTime: MinTime,
+						MaxTime: MaxTime,
+					}
+					er.Update(metadata)
+				}
+
+				mtx.Lock()
+				defer mtx.Unlock()
+
+				activeEndpoints[addr] = er
 				return
 			}
 
@@ -540,7 +566,7 @@ func (er *endpointRef) Update(metadata *endpointMetadata) {
 	er.mtx.Lock()
 	defer er.mtx.Unlock()
 
-	clients := &endpointClients{}
+	clients := er.clients
 
 	if metadata.Store != nil {
 		clients.store = storepb.NewStoreClient(er.cc)
@@ -564,12 +590,17 @@ func (er *endpointRef) Update(metadata *endpointMetadata) {
 		clients.exemplar = exemplarspb.NewExemplarsClient(er.cc)
 	}
 
+	er.clients = clients
 	er.metadata = metadata
 }
 
 func (er *endpointRef) ComponentType() component.Component {
 	er.mtx.RLock()
 	defer er.mtx.RUnlock()
+
+	if er.metadata == nil {
+		return component.UnknownStoreAPI
+	}
 
 	return component.FromString(er.metadata.ComponentType)
 }
@@ -613,6 +644,10 @@ func (er *endpointRef) LabelSets() []labels.Labels {
 	er.mtx.RLock()
 	defer er.mtx.RUnlock()
 
+	if er.metadata == nil {
+		return make([]labels.Labels, 0)
+	}
+
 	labelSet := make([]labels.Labels, 0, len(er.metadata.LabelSets))
 	for _, ls := range labelpb.ZLabelSetsToPromLabelSets(er.metadata.LabelSets...) {
 		if len(ls) == 0 {
@@ -630,6 +665,10 @@ func (er *endpointRef) LabelSets() []labels.Labels {
 func (er *endpointRef) TimeRange() (mint int64, maxt int64) {
 	er.mtx.RLock()
 	defer er.mtx.RUnlock()
+
+	if er.metadata == nil || er.metadata.Store == nil {
+		return MinTime, MaxTime
+	}
 
 	// Currently, min/max time of only StoreAPI is being updated by all components.
 	return er.metadata.Store.MinTime, er.metadata.Store.MaxTime
@@ -657,24 +696,8 @@ type endpointClients struct {
 	info           infopb.InfoClient
 }
 
-func NewEndpointClients(clients ...func(*endpointClients)) *endpointClients {
-	ec := &endpointClients{}
-
-	for _, c := range clients {
-		c(ec)
-	}
-
-	return ec
-}
-
-func InfoClient(info infopb.InfoClient) func(*endpointClients) {
-	return func(ec *endpointClients) {
-		ec.info = info
-	}
-}
-
 type endpointMetadata struct {
-	infopb.InfoResponse
+	*infopb.InfoResponse
 }
 
 func newEndpointAPIStats() map[component.Component]map[string]int {
