@@ -75,6 +75,14 @@ groups:
     annotations:
       summary: "I always complain and I have been loaded via /-/reload."
 `
+	testRuleRecordAbsentMetric = `
+groups:
+- name: example_record_rules
+  interval: 1s
+  rules:
+  - record: test_absent_metric
+    expr: absent(nonexistent{job='thanos-receive'})
+`
 	amTimeout = model.Duration(10 * time.Second)
 )
 
@@ -388,15 +396,6 @@ func TestRule(t *testing.T) {
 func TestRule_CanRemoteWriteData(t *testing.T) {
 	t.Parallel()
 
-	testRuleRecordAbsentMetric := `
-groups:
-- name: example_record_rules
-  interval: 1s
-  rules:
-  - record: test_absent_metric
-    expr: absent(nonexistent{job='thanos-receive'})
-`
-
 	s, err := e2e.NewScenario("e2e_test_rule_remote_write")
 	testutil.Ok(t, err)
 	t.Cleanup(e2ethanos.CleanScenario(t, s))
@@ -407,13 +406,16 @@ groups:
 	rulesSubDir := "rules"
 	rulesPath := filepath.Join(s.SharedDir(), rulesSubDir)
 	testutil.Ok(t, os.MkdirAll(rulesPath, os.ModePerm))
-	createRuleFile(t, filepath.Join(rulesPath, "rules-0.yaml"), testRuleRecordAbsentMetric)
+
+	for i, rule := range []string{testRuleRecordAbsentMetric, testAlertRuleWarnOnPartialResponse} {
+		createRuleFile(t, filepath.Join(rulesPath, fmt.Sprintf("rules-%d.yaml", i)), rule)
+	}
 
 	am, err := e2ethanos.NewAlertmanager(s.SharedDir(), "1")
 	testutil.Ok(t, err)
 	testutil.Ok(t, s.StartAndWaitReady(am))
 
-	receiver, err := e2ethanos.NewReceiver(s.SharedDir(), s.NetworkName(), "1", 1)
+	receiver, err := e2ethanos.NewIngestingReceiver(s.SharedDir(), s.NetworkName())
 	testutil.Ok(t, err)
 	testutil.Ok(t, s.StartAndWaitReady(receiver))
 	rwURL := mustURLParse(t, e2ethanos.RemoteWriteEndpoint(receiver.NetworkEndpoint(8081)))
@@ -459,7 +461,7 @@ groups:
 			{
 				"__name__":  "test_absent_metric",
 				"job":       "thanos-receive",
-				"receive":   "1",
+				"receive":   "e2e_test_rule_remote_write",
 				"tenant_id": "default-tenant",
 			},
 		})

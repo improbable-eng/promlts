@@ -690,5 +690,5 @@ func (r *remoteWriteQueryable) Close() error {
 }
 
 func (r *remoteWriteQueryable) Select(sortSeries bool, hints *storage.SelectHints, matchers ...*labels.Matcher) storage.SeriesSet {
-	return nil
+	return storage.EmptySeriesSet()
 }
