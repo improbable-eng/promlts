@@ -953,11 +953,39 @@ func TestEndpointSet_APIs_Discovery(t *testing.T) {
 						gotMetricMetadata += 1
 					}
 				}
-				testutil.Equals(t, tc.states[currentState].expectedStores, gotStores)
-				testutil.Equals(t, tc.states[currentState].expectedRules, gotRules)
-				testutil.Equals(t, tc.states[currentState].expectedTarget, gotTarget)
-				testutil.Equals(t, tc.states[currentState].expectedMetricMetadata, gotMetricMetadata)
-				testutil.Equals(t, tc.states[currentState].expectedExemplars, gotExemplars)
+				testutil.Equals(
+					t,
+					tc.states[currentState].expectedStores,
+					gotStores,
+					"unexepected discovered storeAPIs in state %q",
+					tc.states[currentState].name)
+				testutil.Equals(
+					t,
+					tc.states[currentState].expectedRules,
+					gotRules,
+					"unexepected discovered rulesAPIs in state %q",
+					tc.states[currentState].name)
+				testutil.Equals(
+					t,
+					tc.states[currentState].expectedTarget,
+					gotTarget,
+					"unexepected discovered targetAPIs in state %q",
+					tc.states[currentState].name,
+				)
+				testutil.Equals(
+					t,
+					tc.states[currentState].expectedMetricMetadata,
+					gotMetricMetadata,
+					"unexepected discovered metricMetadataAPIs in state %q",
+					tc.states[currentState].name,
+				)
+				testutil.Equals(
+					t,
+					tc.states[currentState].expectedExemplars,
+					gotExemplars,
+					"unexepected discovered ExemplarsAPIs in state %q",
+					tc.states[currentState].name,
+				)
 
 				currentState = currentState + 1
 				if len(tc.states) == currentState {
@@ -1014,6 +1042,9 @@ func TestUpdateEndpointStateLastError(t *testing.T) {
 		}
 		mockEndpointRef := &endpointRef{
 			addr: "mockedStore",
+			metadata: &endpointMetadata{
+				&infopb.InfoResponse{},
+			},
 		}
 
 		mockedEndpointSet.updateEndpointStatus(mockEndpointRef, tc.InputError)
@@ -1030,6 +1061,9 @@ func TestUpdateEndpointStateForgetsPreviousErrors(t *testing.T) {
 	}
 	mockEndpointRef := &endpointRef{
 		addr: "mockedStore",
+		metadata: &endpointMetadata{
+			&infopb.InfoResponse{},
+		},
 	}
 
 	mockEndpointSet.updateEndpointStatus(mockEndpointRef, errors.New("test err"))

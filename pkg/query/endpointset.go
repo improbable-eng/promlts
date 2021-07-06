@@ -114,7 +114,7 @@ type EndpointStatus struct {
 
 // storeSetNodeCollector is a metric collector reporting the number of available storeAPIs for Querier.
 // A Collector is required as we want atomic updates for all 'thanos_store_nodes_grpc_connections' series.
-// TODO(hitanshu-mehta) Currently,only collecting metrices of storeAPI. Make this struct generic.
+// TODO(hitanshu-mehta) Currently,only collecting metrics of storeAPI. Make this struct generic.
 type endpointSetNodeCollector struct {
 	mtx             sync.Mutex
 	storeNodes      map[component.Component]map[string]int
@@ -272,8 +272,7 @@ func (e *EndpointSet) Update(ctx context.Context) {
 
 		// All producers should have unique external labels. While this does not check only StoreAPIs connected to
 		// this querier this allows to notify early user about misconfiguration. Warn only. This is also detectable from metric.
-		if (er.ComponentType() != nil &&
-			(er.ComponentType() == component.Sidecar || er.ComponentType() == component.Rule)) &&
+		if (er.ComponentType() == component.Sidecar || er.ComponentType() == component.Rule) &&
 			stats[component.Sidecar][extLset]+stats[component.Rule][extLset] > 0 {
 
 			level.Warn(e.logger).Log("msg", "found duplicate storeAPI producer (sidecar or ruler). This is not advices as it will malform data in in the same bucket",
@@ -598,10 +597,6 @@ func (er *endpointRef) ComponentType() component.Component {
 	er.mtx.RLock()
 	defer er.mtx.RUnlock()
 
-	if er.metadata == nil {
-		return component.UnknownStoreAPI
-	}
-
 	return component.FromString(er.metadata.ComponentType)
 }
 
@@ -662,7 +657,7 @@ func (er *endpointRef) LabelSets() []labels.Labels {
 	return labelSet
 }
 
-func (er *endpointRef) TimeRange() (mint int64, maxt int64) {
+func (er *endpointRef) TimeRange() (mint, maxt int64) {
 	er.mtx.RLock()
 	defer er.mtx.RUnlock()
 
