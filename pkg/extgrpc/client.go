@@ -20,15 +20,8 @@ import (
 	"github.com/thanos-io/thanos/pkg/tracing"
 )
 
-func StoreClientGRPCOptsFromTlsConfig(logger log.Logger, reg *prometheus.Registry, tracer opentracing.Tracer, skipVerify bool, tlsConfig *store.TlsConfiguration) ([]grpc.DialOption, error) {
-	if tlsConfig != nil {
-		return StoreClientGRPCOpts(logger, reg, tracer, true, skipVerify, tlsConfig.Cert, tlsConfig.Key, tlsConfig.CaCert, tlsConfig.ServerName)
-	}
-	return StoreClientGRPCOpts(logger, reg, tracer, false, skipVerify, "", "", "", "")
-}
-
 // StoreClientGRPCOpts creates gRPC dial options for connecting to a store client.
-func StoreClientGRPCOpts(logger log.Logger, reg *prometheus.Registry, tracer opentracing.Tracer, secure, skipVerify bool, cert, key, caCert, serverName string) ([]grpc.DialOption, error) {
+func StoreClientGRPCOpts(logger log.Logger, reg *prometheus.Registry, tracer opentracing.Tracer, secure, skipVerify bool, tlsConfig store.TLSConfiguration) ([]grpc.DialOption, error) {
 	grpcMets := grpc_prometheus.NewClientMetrics()
 	grpcMets.EnableClientHandlingTimeHistogram(
 		grpc_prometheus.WithHistogramBuckets([]float64{0.001, 0.01, 0.1, 0.3, 0.6, 1, 3, 6, 9, 20, 30, 60, 90, 120, 240, 360, 720}),
@@ -56,13 +49,14 @@ func StoreClientGRPCOpts(logger log.Logger, reg *prometheus.Registry, tracer ope
 		reg.MustRegister(grpcMets)
 	}
 
-	if !secure {
+	// If secure is false or no TLS config is supplied.
+	if !secure || (tlsConfig == store.TLSConfiguration{}) {
 		return append(dialOpts, grpc.WithInsecure()), nil
 	}
 
 	level.Info(logger).Log("msg", "enabling client to server TLS")
 
-	tlsCfg, err := tls.NewClientConfig(logger, cert, key, caCert, serverName, skipVerify)
+	tlsCfg, err := tls.NewClientConfig(logger, tlsConfig.CertFile, tlsConfig.KeyFile, tlsConfig.CaCertFile, tlsConfig.ServerName, skipVerify)
 	if err != nil {
 		return nil, err
 	}
