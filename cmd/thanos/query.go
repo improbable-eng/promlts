@@ -127,7 +127,7 @@ func registerQuery(app *extkingpin.App) {
 	fileSDInterval := extkingpin.ModelDuration(cmd.Flag("store.sd-interval", "Refresh interval to re-read file SD files. It is used as a resync fallback.").
 		Default("5m"))
 
-	endpointConfig := extflag.RegisterPathOrContent(cmd, "endpoint.config", "YAML file that contains store API servers configuration.", extflag.WithEnvSubstitution())
+	endpointConfig := extflag.RegisterPathOrContent(cmd, "endpoint.config", "YAML file that contains store API servers configuration. Either use this option or seperate endpoint options (endpoint, endpoint.sd-files, endpoint.srict).", extflag.WithEnvSubstitution())
 
 	// TODO(bwplotka): Grab this from TTL at some point.
 	dnsSDInterval := extkingpin.ModelDuration(cmd.Flag("store.sd-dns-interval", "Interval between DNS resolutions.").
@@ -200,6 +200,10 @@ func registerQuery(app *extkingpin.App) {
 		endpointConfigYAML, err := endpointConfig.Content()
 		if err != nil {
 			return err
+		}
+
+		if (len(*fileSDFiles) != 0 || len(*stores) != 0) && len(endpointConfigYAML) != 0 {
+			return errors.Errorf("--sore/--store.sd-files and --endpoint.config parameters cannot be defined at the same time")
 		}
 
 		var fileSDConfig *file.SDConfig
@@ -343,7 +347,7 @@ func runQuery(
 		Help: "The number of times a duplicated store addresses is detected from the different configs in query",
 	})
 
-	// TLSConfig for endpoints supplied in --endpoint, --endpoint.sd-files and --endpoint-strict.
+	// TLSConfig for endpoints provided in --endpoint, --endpoint.sd-files and --endpoint-strict.
 	var TLSConfig store.TLSConfiguration
 	if secure {
 		TLSConfig.CertFile = cert
@@ -352,10 +356,50 @@ func runQuery(
 		TLSConfig.ServerName = serverName
 	}
 
-	endpointsConfig, err := store.LoadConfig(endpointConfigYAML, storeAddrs, strictStores, fileSDConfig, TLSConfig)
-	if err != nil {
-		return errors.Wrap(err, "loading store config")
+	var endpointsConfig []store.Config
+	var err error
+	if len(endpointConfigYAML) > 0 {
+		endpointsConfig, err = store.LoadConfig(endpointConfigYAML)
+		if err != nil {
+			return errors.Wrap(err, "loading endpoint config")
+		}
+	} else {
+		endpointsConfig, err = store.NewConfig(storeAddrs, strictStores, fileSDConfig, TLSConfig)
+		if err != nil {
+			return errors.Wrap(err, "initialising endpoint config from individual flags")
+		}
 	}
+
+	fileSDCache := cache.New()
+	dnsStoreProvider := dns.NewProvider(
+		logger,
+		extprom.WrapRegistererWithPrefix("thanos_query_store_apis_", reg),
+		dns.ResolverType(dnsSDResolver),
+	)
+
+	dnsRuleProvider := dns.NewProvider(
+		logger,
+		extprom.WrapRegistererWithPrefix("thanos_query_rule_apis_", reg),
+		dns.ResolverType(dnsSDResolver),
+	)
+
+	dnsTargetProvider := dns.NewProvider(
+		logger,
+		extprom.WrapRegistererWithPrefix("thanos_query_target_apis_", reg),
+		dns.ResolverType(dnsSDResolver),
+	)
+
+	dnsMetadataProvider := dns.NewProvider(
+		logger,
+		extprom.WrapRegistererWithPrefix("thanos_query_metadata_apis_", reg),
+		dns.ResolverType(dnsSDResolver),
+	)
+
+	dnsExemplarProvider := dns.NewProvider(
+		logger,
+		extprom.WrapRegistererWithPrefix("thanos_query_exemplar_apis_", reg),
+		dns.ResolverType(dnsSDResolver),
+	)
 
 	var storeSets []*query.StoreSet
 	for _, config := range endpointsConfig {
@@ -363,37 +407,6 @@ func runQuery(
 		if err != nil {
 			return errors.Wrap(err, "building gRPC client")
 		}
-
-		fileSDCache := cache.New()
-		dnsStoreProvider := dns.NewProvider(
-			logger,
-			extprom.WrapRegistererWithPrefix("thanos_query_store_apis_", reg),
-			dns.ResolverType(dnsSDResolver),
-		)
-
-		dnsRuleProvider := dns.NewProvider(
-			logger,
-			extprom.WrapRegistererWithPrefix("thanos_query_rule_apis_", reg),
-			dns.ResolverType(dnsSDResolver),
-		)
-
-		dnsTargetProvider := dns.NewProvider(
-			logger,
-			extprom.WrapRegistererWithPrefix("thanos_query_target_apis_", reg),
-			dns.ResolverType(dnsSDResolver),
-		)
-
-		dnsMetadataProvider := dns.NewProvider(
-			logger,
-			extprom.WrapRegistererWithPrefix("thanos_query_metadata_apis_", reg),
-			dns.ResolverType(dnsSDResolver),
-		)
-
-		dnsExemplarProvider := dns.NewProvider(
-			logger,
-			extprom.WrapRegistererWithPrefix("thanos_query_exemplar_apis_", reg),
-			dns.ResolverType(dnsSDResolver),
-		)
 
 		var spec []query.StoreSpec
 		// Add strict & static nodes.
@@ -521,18 +534,6 @@ func runQuery(
 					if err := dnsStoreProvider.Resolve(resolveCtx, append(fileSDCache.Addresses(), staticAddresses...)); err != nil {
 						level.Error(logger).Log("msg", "failed to resolve addresses for storeAPIs", "err", err)
 					}
-					if err := dnsRuleProvider.Resolve(resolveCtx, ruleAddrs); err != nil {
-						level.Error(logger).Log("msg", "failed to resolve addresses for rulesAPIs", "err", err)
-					}
-					if err := dnsTargetProvider.Resolve(ctx, targetAddrs); err != nil {
-						level.Error(logger).Log("msg", "failed to resolve addresses for targetsAPIs", "err", err)
-					}
-					if err := dnsMetadataProvider.Resolve(resolveCtx, metadataAddrs); err != nil {
-						level.Error(logger).Log("msg", "failed to resolve addresses for metadataAPIs", "err", err)
-					}
-					if err := dnsExemplarProvider.Resolve(resolveCtx, exemplarAddrs); err != nil {
-						level.Error(logger).Log("msg", "failed to resolve addresses for exemplarsAPI", "err", err)
-					}
 					return nil
 				})
 			}, func(error) {
@@ -540,6 +541,33 @@ func runQuery(
 			})
 		}
 	}
+
+	// Periodically update the addresses from static flags and file SD by resolving them using DNS SD if necessary.
+	{
+		ctx, cancel := context.WithCancel(context.Background())
+		g.Add(func() error {
+			return runutil.Repeat(dnsSDInterval, ctx.Done(), func() error {
+				resolveCtx, resolveCancel := context.WithTimeout(ctx, dnsSDInterval)
+				defer resolveCancel()
+				if err := dnsRuleProvider.Resolve(resolveCtx, ruleAddrs); err != nil {
+					level.Error(logger).Log("msg", "failed to resolve addresses for rulesAPIs", "err", err)
+				}
+				if err := dnsTargetProvider.Resolve(ctx, targetAddrs); err != nil {
+					level.Error(logger).Log("msg", "failed to resolve addresses for targetsAPIs", "err", err)
+				}
+				if err := dnsMetadataProvider.Resolve(resolveCtx, metadataAddrs); err != nil {
+					level.Error(logger).Log("msg", "failed to resolve addresses for metadataAPIs", "err", err)
+				}
+				if err := dnsExemplarProvider.Resolve(resolveCtx, exemplarAddrs); err != nil {
+					level.Error(logger).Log("msg", "failed to resolve addresses for exemplarsAPI", "err", err)
+				}
+				return nil
+			})
+		}, func(error) {
+			cancel()
+		})
+	}
+
 	var (
 		get               []store.Client
 		getRuleClient     []rulespb.RulesClient

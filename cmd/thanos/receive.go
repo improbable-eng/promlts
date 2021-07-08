@@ -135,8 +135,6 @@ func runReceive(
 		tracer,
 		*conf.grpcCert != "",
 		*conf.grpcClientCA == "",
-		conf.rwServerCert != "",
-		conf.rwServerClientCA == "",
 		TLSConfig,
 	)
 	if err != nil {

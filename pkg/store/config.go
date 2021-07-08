@@ -37,20 +37,41 @@ const (
 	StrictEndpointMode  EndpointMode = "strict"
 )
 
-// LoadConfig loads and returns list of per-endpoint TLS config.
-func LoadConfig(confYAML []byte, endpointAddrs []string, strictEndpointAddrs []string, fileSDConfig *file.SDConfig, TLSConfig TLSConfiguration) ([]Config, error) {
+func NewConfig(endpointAddrs []string, strictEndpointAddrs []string, fileSDConfig *file.SDConfig, TLSConfig TLSConfiguration) ([]Config, error) {
 	var endpointConfig []Config
 
-	if len(confYAML) > 0 {
-		if err := yaml.UnmarshalStrict(confYAML, &endpointConfig); err != nil {
-			return nil, err
-		}
+	// Adding --endpoint, --endpoint.sd-files info to []endpointConfig, if provided.
+	if len(endpointAddrs) > 0 || fileSDConfig != nil {
+		cfg1 := Config{}
+		cfg1.TLSConfig = TLSConfig
+		cfg1.Endpoints = strictEndpointAddrs
+		cfg1.EndpointsSD = []file.SDConfig{*fileSDConfig}
+		endpointConfig = append(endpointConfig, cfg1)
 	}
 
-	// Checking if no proper mode is provided.
+	// Adding --endpoint-strict endpoints if provided.
+	if len(strictEndpointAddrs) > 0 {
+		cfg2 := Config{}
+		cfg2.TLSConfig = TLSConfig
+		cfg2.Endpoints = strictEndpointAddrs
+		cfg2.Mode = StrictEndpointMode
+		endpointConfig = append(endpointConfig, cfg2)
+	}
+	return endpointConfig, nil
+}
+
+// LoadConfig loads and returns list of per-endpoint TLS config.
+func LoadConfig(confYAML []byte) ([]Config, error) {
+	var endpointConfig []Config
+
+	if err := yaml.UnmarshalStrict(confYAML, &endpointConfig); err != nil {
+		return nil, err
+	}
+
+	// Checking if wrong mode is provided.
 	for _, config := range endpointConfig {
 		if config.Mode != StrictEndpointMode && config.Mode != DefaultEndpointMode {
-			return nil, errors.Errorf("%s is not a proper mode", config.Mode)
+			return nil, errors.Errorf("%s is wrong mode", config.Mode)
 		}
 	}
 
@@ -70,36 +91,6 @@ func LoadConfig(confYAML []byte, endpointAddrs []string, strictEndpointAddrs []s
 			}
 			allEndpoints[addr] = struct{}{}
 		}
-	}
-
-	// Adding --endpoint, --endpoint.sd-files info to []endpointConfig, if provided.
-	if len(endpointAddrs) > 0 || fileSDConfig != nil {
-		cfg1 := Config{}
-		cfg1.TLSConfig = TLSConfig
-		for _, addr := range endpointAddrs {
-			if _, exists := allEndpoints[addr]; exists {
-				return []Config{}, errors.Errorf("%s endpoint provided more than once", addr)
-			}
-			allEndpoints[addr] = struct{}{}
-			cfg1.Endpoints = append(cfg1.Endpoints, addr)
-		}
-		cfg1.EndpointsSD = []file.SDConfig{*fileSDConfig}
-		endpointConfig = append(endpointConfig, cfg1)
-	}
-
-	// Adding --endpoint-strict endpoints if provided.
-	if len(strictEndpointAddrs) > 0 {
-		cfg2 := Config{}
-		cfg2.TLSConfig = TLSConfig
-		for _, addr := range strictEndpointAddrs {
-			if _, exists := allEndpoints[addr]; exists {
-				return []Config{}, errors.Errorf("%s endpoint provided more than once", addr)
-			}
-			allEndpoints[addr] = struct{}{}
-			cfg2.Endpoints = append(cfg2.Endpoints, addr)
-		}
-		cfg2.Mode = StrictEndpointMode
-		endpointConfig = append(endpointConfig, cfg2)
 	}
 
 	return endpointConfig, nil
