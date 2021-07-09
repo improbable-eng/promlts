@@ -11,6 +11,7 @@ import (
 	"io/ioutil"
 	"path"
 	"sort"
+	"sync"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
@@ -178,7 +179,7 @@ func newReplicationScheme(
 	}
 }
 
-func (rs *replicationScheme) execute(ctx context.Context) error {
+func (rs *replicationScheme) execute(ctx context.Context, maxConcurrent int) error {
 	availableBlocks := []*metadata.Meta{}
 
 	metas, partials, err := rs.fetcher.Fetch(ctx)
@@ -203,9 +204,38 @@ func (rs *replicationScheme) execute(ctx context.Context) error {
 		return availableBlocks[i].BlockMeta.MinTime < availableBlocks[j].BlockMeta.MinTime
 	})
 
+	// Replicate concurrently.
+	var wg sync.WaitGroup
+	errChan := make(chan error)
+	finishChan := make(chan struct{})
+
+	// Control number of goroutines to be  with channel.
+	//TODO: Set the maximum number of workers by user. The maximum number is set as 3 temporarily.
+	numChan := make(chan struct{}, maxConcurrent)
 	for _, b := range availableBlocks {
-		if err := rs.ensureBlockIsReplicated(ctx, b.BlockMeta.ULID); err != nil {
-			return errors.Wrapf(err, "ensure block %v is replicated", b.BlockMeta.ULID.String())
+		numChan <- struct{}{}
+		wg.Add(1)
+		go func(b *metadata.Meta) {
+			defer wg.Done()
+			if err := rs.ensureBlockIsReplicated(ctx, b.BlockMeta.ULID); err != nil {
+				errChan <- errors.Wrapf(err, "ensure block %v is replicated", b.BlockMeta.ULID.String())
+			}
+			<-numChan
+		}(b)
+	}
+
+	go func() {
+		wg.Wait()
+		close(finishChan)
+	}()
+
+Loop:
+	for {
+		select {
+		case err := <-errChan:
+			return err
+		case <-finishChan:
+			break Loop
 		}
 	}
 

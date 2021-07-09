@@ -21,6 +21,7 @@ We use *breaking :warning:* to mark changes that are not backward compatible (re
 - [#4392](https://github.com/thanos-io/thanos/pull/4392) Tools: Added `--delete-blocks` to bucket rewrite tool to mark the original blocks for deletion after rewriting is done.
 - [#3970](https://github.com/thanos-io/thanos/pull/3970) Azure: Adds more configuration options for Azure blob storage. This allows for pipeline and reader specific configuration. Implements HTTP transport configuration options. These options allows for more fine-grained control on timeouts and retries. Implements MSI authentication as second method of authentication via a service principal token.
 - [#4406](https://github.com/thanos-io/thanos/pull/4406) Tools: Add retention command for applying retention policy on the bucket.
+- [#4406](https://github.com/thanos-io/thanos/pull/4350) Tools: Added `--max-concurrent` to bucket replication to replicate blocks concurrently.
 
 ### Fixed
 
