@@ -35,12 +35,26 @@ type InMemoryCacheConfig struct {
 	MaxSize model.Bytes `yaml:"max_size"`
 	// MaxItemSize represents maximum size of single item.
 	MaxItemSize model.Bytes `yaml:"max_item_size"`
+	// Singleflight represents whether we should try to avoid cache stampede
+	// by only doing a request once. In practice, this means some very small
+	// locking on each cache operation, and that Fetch() context's deadline
+	// becomes "attached" to the other in-flight request.
+	Singleflight bool `yaml:"single_flight"`
+}
+
+type pubsub struct {
+	listeners   []chan []byte
+	originalCtx context.Context
 }
 
 type InMemoryCache struct {
 	logger           log.Logger
 	maxSizeBytes     uint64
 	maxItemSizeBytes uint64
+	singleFlight     bool
+
+	subs map[string]*pubsub
+	mu   sync.RWMutex
 
 	mtx         sync.Mutex
 	curSize     uint64
@@ -53,6 +67,7 @@ type InMemoryCache struct {
 	// instead of simply using the one sent by the caller.
 	added            prometheus.Counter
 	current          prometheus.Gauge
+	sfSaved          prometheus.Counter
 	currentSize      prometheus.Gauge
 	totalCurrentSize prometheus.Gauge
 	overflow         prometheus.Counter
@@ -100,6 +115,16 @@ func NewInMemoryCacheWithConfig(name string, logger log.Logger, reg prometheus.R
 		logger:           logger,
 		maxSizeBytes:     uint64(config.MaxSize),
 		maxItemSizeBytes: uint64(config.MaxItemSize),
+		singleFlight:     config.Singleflight,
+	}
+
+	if config.Singleflight {
+		c.subs = make(map[string]*pubsub)
+		c.sfSaved = promauto.With(reg).NewCounter(prometheus.CounterOpts{
+			Name:        "thanos_cache_inmemory_singleflight_saved_calls_total",
+			Help:        "Total number of calls saved by the singleflight mechanism.",
+			ConstLabels: prometheus.Labels{"name": name},
+		})
 	}
 
 	c.evicted = promauto.With(reg).NewCounter(prometheus.CounterOpts{
@@ -289,6 +314,24 @@ func (c *InMemoryCache) reset() {
 func (c *InMemoryCache) Store(ctx context.Context, data map[string][]byte, ttl time.Duration) {
 	for key, val := range data {
 		c.set(key, val, ttl)
+		if !c.singleFlight {
+			continue
+		}
+
+		c.mu.Lock()
+
+		if _, ok := c.subs[key]; !ok {
+			c.mu.Unlock()
+			continue
+		}
+
+		for _, listener := range c.subs[key].listeners {
+			listener <- val
+			close(listener)
+		}
+
+		delete(c.subs, key)
+		c.mu.Unlock()
 	}
 }
 
@@ -299,7 +342,36 @@ func (c *InMemoryCache) Fetch(ctx context.Context, keys []string) map[string][]b
 	for _, key := range keys {
 		if b, ok := c.get(key); ok {
 			results[key] = b
+			continue
+		}
+		if !c.singleFlight {
+			continue
+		}
+
+		c.mu.Lock()
+		if _, ok := c.subs[key]; !ok {
+			c.subs[key] = &pubsub{originalCtx: ctx}
+			c.mu.Unlock()
+		} else {
+			if c.subs[key].originalCtx.Err() != nil {
+				c.subs[key] = &pubsub{originalCtx: ctx}
+			}
+			originalCtx := c.subs[key].originalCtx
+			respReceiver := make(chan []byte)
+			c.subs[key].listeners = append(c.subs[key].listeners, respReceiver)
+			c.mu.Unlock()
+
+			select {
+			case b := <-respReceiver:
+				results[key] = b
+				c.sfSaved.Inc()
+			case <-ctx.Done():
+				return results
+			case <-originalCtx.Done():
+				continue
+			}
 		}
 	}
+
 	return results
 }
