@@ -37,6 +37,7 @@ const (
 	StrictEndpointMode  EndpointMode = "strict"
 )
 
+// NewConfig returns list of per-endpoint TLS config from individual flags.
 func NewConfig(endpointAddrs []string, strictEndpointAddrs []string, fileSDConfig *file.SDConfig, TLSConfig TLSConfiguration) ([]Config, error) {
 	var endpointConfig []Config
 
@@ -44,8 +45,10 @@ func NewConfig(endpointAddrs []string, strictEndpointAddrs []string, fileSDConfi
 	if len(endpointAddrs) > 0 || fileSDConfig != nil {
 		cfg1 := Config{}
 		cfg1.TLSConfig = TLSConfig
-		cfg1.Endpoints = strictEndpointAddrs
-		cfg1.EndpointsSD = []file.SDConfig{*fileSDConfig}
+		cfg1.Endpoints = endpointAddrs
+		if fileSDConfig != nil {
+			cfg1.EndpointsSD = []file.SDConfig{*fileSDConfig}
+		}
 		endpointConfig = append(endpointConfig, cfg1)
 	}
 
@@ -60,7 +63,7 @@ func NewConfig(endpointAddrs []string, strictEndpointAddrs []string, fileSDConfi
 	return endpointConfig, nil
 }
 
-// LoadConfig loads and returns list of per-endpoint TLS config.
+// LoadConfig returns list of per-endpoint TLS config.
 func LoadConfig(confYAML []byte) ([]Config, error) {
 	var endpointConfig []Config
 
