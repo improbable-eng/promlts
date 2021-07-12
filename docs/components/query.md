@@ -262,13 +262,13 @@ Flags:
                                  Alternative to 'endpoint.config-file' flag
                                  (mutually exclusive). Content of YAML file that
                                  contains store API servers configuration.
-                                 Either use this option or seperate endpoint
+                                 Either use this option or separate endpoint
                                  options (endpoint, endpoint.sd-files,
                                  endpoint.srict).
       --endpoint.config-file=<file-path>  
                                  Path to YAML file that contains store API
                                  servers configuration. Either use this option
-                                 or seperate endpoint options (endpoint,
+                                 or separate endpoint options (endpoint,
                                  endpoint.sd-files, endpoint.srict).
       --grpc-address="0.0.0.0:10901"  
                                  Listen ip:port address for gRPC endpoints

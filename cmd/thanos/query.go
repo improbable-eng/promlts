@@ -569,19 +569,6 @@ func runQuery(
 	}
 
 	var (
-		getRuleClient     []rulespb.RulesClient
-		getTargetClient   []targetspb.TargetsClient
-		getMetadataClient []metadatapb.MetadataClient
-		getExemplarsStore []*exemplarspb.ExemplarStore
-	)
-
-	for _, ss := range storeSets {
-		getRuleClient = append(getRuleClient, ss.GetRulesClients()...)
-		getTargetClient = append(getTargetClient, ss.GetTargetsClients()...)
-		getMetadataClient = append(getMetadataClient, ss.GetMetadataClients()...)
-		getExemplarsStore = append(getExemplarsStore, ss.GetExemplarsStores()...)
-	}
-	var (
 		allClients = func() []store.Client {
 			var get []store.Client
 			for _, ss := range storeSets {
@@ -590,15 +577,31 @@ func runQuery(
 			return get
 		}
 		ruleClients = func() []rulespb.RulesClient {
+			var getRuleClient []rulespb.RulesClient
+			for _, ss := range storeSets {
+				getRuleClient = append(getRuleClient, ss.GetRulesClients()...)
+			}
 			return getRuleClient
 		}
 		targetClients = func() []targetspb.TargetsClient {
+			var getTargetClient []targetspb.TargetsClient
+			for _, ss := range storeSets {
+				getTargetClient = append(getTargetClient, ss.GetTargetsClients()...)
+			}
 			return getTargetClient
 		}
 		metadataClients = func() []metadatapb.MetadataClient {
+			var getMetadataClient []metadatapb.MetadataClient
+			for _, ss := range storeSets {
+				getMetadataClient = append(getMetadataClient, ss.GetMetadataClients()...)
+			}
 			return getMetadataClient
 		}
 		exemplarStore = func() []*exemplarspb.ExemplarStore {
+			var getExemplarsStore []*exemplarspb.ExemplarStore
+			for _, ss := range storeSets {
+				getExemplarsStore = append(getExemplarsStore, ss.GetExemplarsStores()...)
+			}
 			return getExemplarsStore
 		}
 		proxy            = store.NewProxyStore(logger, reg, allClients, component.Query, selectorLset, storeResponseTimeout)
