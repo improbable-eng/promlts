@@ -22,6 +22,7 @@ option (gogoproto.goproto_sizecache_all) = false;
 
 service Metadata {
   rpc MetricMetadata(MetricMetadataRequest) returns (stream MetricMetadataResponse);
+  rpc TargetMetadata(TargetMetadataRequest) returns (stream TargetMetadataResponse);
 }
 
 message MetricMetadataRequest {
@@ -53,4 +54,38 @@ message Meta {
   string type = 1 [(gogoproto.jsontag) = "type"];
   string help = 2 [(gogoproto.jsontag) = "help"];
   string unit = 3 [(gogoproto.jsontag) = "unit"];
+}
+
+message Target {
+  string instance = 1 [(gogoproto.jsontag) = "instance"];
+  string job = 2 [(gogoproto.jsontag) = "job"];
+}
+
+message TargetMetadata {
+  Target target = 1 [(gogoproto.jsontag) = "target", (gogoproto.nullable) = false];
+  // metric will be empty value if metric is requested explicitly
+  string metric = 2 [(gogoproto.jsontag) = "metric"];
+  string type = 3 [(gogoproto.jsontag) = "type"];
+  string help = 4 [(gogoproto.jsontag) = "help"];
+  string unit = 5 [(gogoproto.jsontag) = "unit"];
+}
+
+message TargetMetadataRequest {
+  // A metric name to retrieve metadata for. All metric metadata is retrieved if left empty.
+  string metric = 1;
+  // Label selectors that match targets by their label sets. All targets are selected if left empty.
+  string match_target = 2;
+  // Maximum number of targets to match
+  int32 limit = 3;
+  PartialResponseStrategy partial_response_strategy = 4;
+}
+
+message TargetMetadataResponse {
+  oneof result {
+    TargetMetadata data = 1;
+
+    /// warning is considered an information piece in place of series for warning purposes.
+    /// It is used to warn metadata API users about suspicious cases or partial response (if enabled).
+    string warning = 2;
+  }
 }
