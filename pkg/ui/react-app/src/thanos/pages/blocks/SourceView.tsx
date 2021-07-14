@@ -2,18 +2,32 @@ import React, { FC } from 'react';
 import { Block, BlocksPool } from './block';
 import { BlockSpan } from './BlockSpan';
 import styles from './blocks.module.css';
+import { getBlockByUlid } from './helpers';
 
 export const BlocksRow: FC<{
   blocks: Block[];
   gridMinTime: number;
   gridMaxTime: number;
   selectBlock: React.Dispatch<React.SetStateAction<Block | undefined>>;
-}> = ({ blocks, gridMinTime, gridMaxTime, selectBlock }) => {
+  blockSearch: string;
+}> = ({ blocks, gridMinTime, gridMaxTime, selectBlock, blockSearch }) => {
+  const blockSearchValue = getBlockByUlid(blocks, blockSearch);
+
   return (
     <div className={styles.row}>
-      {blocks.map<JSX.Element>((b) => (
-        <BlockSpan selectBlock={selectBlock} block={b} gridMaxTime={gridMaxTime} gridMinTime={gridMinTime} key={b.ulid} />
-      ))}
+      {blocks.map<JSX.Element | undefined>((b) => {
+        if (b.ulid === blockSearchValue || blockSearch === '') {
+          return (
+            <BlockSpan
+              selectBlock={selectBlock}
+              block={b}
+              gridMaxTime={gridMaxTime}
+              gridMinTime={gridMinTime}
+              key={b.ulid}
+            />
+          );
+        }
+      })}
     </div>
   );
 };
@@ -24,9 +38,10 @@ export interface SourceViewProps {
   gridMinTime: number;
   gridMaxTime: number;
   selectBlock: React.Dispatch<React.SetStateAction<Block | undefined>>;
+  blockSearch: string;
 }
 
-export const SourceView: FC<SourceViewProps> = ({ data, title, gridMaxTime, gridMinTime, selectBlock }) => {
+export const SourceView: FC<SourceViewProps> = ({ data, title, gridMaxTime, gridMinTime, selectBlock, blockSearch }) => {
   return (
     <>
       <div className={styles.source}>
@@ -43,6 +58,7 @@ export const SourceView: FC<SourceViewProps> = ({ data, title, gridMaxTime, grid
                   key={`${k}-${i}`}
                   gridMaxTime={gridMaxTime}
                   gridMinTime={gridMinTime}
+                  blockSearch={blockSearch}
                 />
               ))}
             </React.Fragment>

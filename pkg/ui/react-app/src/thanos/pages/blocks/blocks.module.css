@@ -190,3 +190,7 @@
 .level-6 {
   background: var(--level-6);
 }
+
+.blockInput {
+  margin-bottom: 12px;
+}
