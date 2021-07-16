@@ -152,3 +152,7 @@ func (stream *metricMetadataStream) receive(ctx context.Context) error {
 		}
 	}
 }
+
+func (s *Proxy) TargetMetadata(request *metadatapb.TargetMetadataRequest, server metadatapb.Metadata_TargetMetadataServer) error {
+	panic("implement me")
+}

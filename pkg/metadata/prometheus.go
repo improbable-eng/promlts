@@ -39,3 +39,7 @@ func (p *Prometheus) MetricMetadata(r *metadatapb.MetricMetadataRequest, s metad
 	})
 	return err
 }
+
+func (p *Prometheus) TargetMetadata(request *metadatapb.TargetMetadataRequest, server metadatapb.Metadata_TargetMetadataServer) error {
+	panic("implement me")
+}
