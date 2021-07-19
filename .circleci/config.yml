@@ -22,7 +22,7 @@ jobs:
       - checkout
       - go/mod-download-cached
       - setup_remote_docker:
-          version: 17.07.0-ce
+          version: 18.06.0-ce
       - run:
           name: Create Secret if PR is not forked
           # GCS integration tests are run only for author's PR that have write access, because these tests
@@ -74,12 +74,14 @@ jobs:
       - checkout
       - go/mod-download-cached
       - setup_remote_docker:
-          version: 17.07.0-ce
+          version: 18.06.0-ce
       - attach_workspace:
           at: .
-      - run: ln -s .build/linux-amd64/thanos thanos
-      - run: make docker
-      - run: docker run thanos --help
+      # register qemu to support mulit-arch
+      - run: docker run --privileged linuxkit/binfmt:v0.7
+      - run: make docker-build
+      - run: make docker-test
+      - run: make docker-manifest
       # Upload to both dockerhub and quay.io.
       - run: echo "${DOCKERHUB_PASSWORD}" | docker login -u="${DOCKERHUB_USERNAME}" --password-stdin
       - run: make docker-push DOCKER_IMAGE_REPO=thanosio/thanos

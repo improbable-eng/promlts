@@ -12,15 +12,23 @@ arch = $(shell uname -m)
 # just visit https://quay.io/repository/prometheus/busybox?tag=latest&tab=tags.
 # TODO(bwplotka): Pinning is important but somehow quay kills the old images, so make sure to update regularly.
 # Update at 2021.6.07
+ARM64_SHA="de4af55df1f648a334e16437c550a2907e0aed4f0b0edf454b0b215a9349bdbb"
+AMD64_SHA="5591971699f6cf8abf6776495385e9d62751111a8cba56bf4946cf1d0de425ed"
 ifeq ($(arch), x86_64)
     # amd64
-    BASE_DOCKER_SHA="de4af55df1f648a334e16437c550a2907e0aed4f0b0edf454b0b215a9349bdbb"
+    BASE_DOCKER_SHA=$(AMD64_SHA)
 else ifeq ($(arch), armv8)
     # arm64
-    BASE_DOCKER_SHA="5591971699f6cf8abf6776495385e9d62751111a8cba56bf4946cf1d0de425ed"
+    BASE_DOCKER_SHA=$(ARM64_SHA)
 else
     echo >&2 "only support amd64 or arm64 arch" && exit 1
 endif
+DOCKER_ARCHS       ?= amd64 arm64
+# Generate two target: docker-xxx-amd64, docker-xxx-arm64.
+# Run make docker-xxx -n to see the result with dry run.
+BUILD_DOCKER_ARCHS = $(addprefix docker-build-,$(DOCKER_ARCHS))
+TEST_DOCKER_ARCHS  = $(addprefix docker-test-,$(DOCKER_ARCHS))
+PUSH_DOCKER_ARCHS  = $(addprefix docker-push-,$(DOCKER_ARCHS))
 
 # Ensure everything works even if GOPATH is not set, which is often the case.
 # The `go env GOPATH` will work for all cases for Go 1.8+.
@@ -160,9 +168,31 @@ docker-multi-stage:
 	@echo ">> building docker image 'thanos' with Dockerfile.multi-stage"
 	@docker build -f Dockerfile.multi-stage -t "thanos" --build-arg BASE_DOCKER_SHA=$(BASE_DOCKER_SHA) .
 
-.PHONY: docker-push
+GET_SHA = $(shell echo '$1'_SHA | tr '[:lower:]' '[:upper:]')
+# docker-build builds docker images with multiple architectures.
+.PHONY: docker-build $(BUILD_DOCKER_ARCHS)
+docker-build: $(BUILD_DOCKER_ARCHS)
+$(BUILD_DOCKER_ARCHS): docker-build-%:
+	@docker build -t "$(DOCKER_IMAGE_REPO)-linux-$*:$(DOCKER_IMAGE_TAG)" \
+		--build-arg BASE_DOCKER_SHA=$($(call GET_SHA,$*)) -f Dockerfile.multi-stage .
+
+.PHONY: docker-test $(TEST_DOCKER_ARCHS)
+docker-test: $(TEST_DOCKER_ARCHS)
+$(TEST_DOCKER_ARCHS): docker-test-%:
+	@echo ">> testing image"
+	@docker run "$(DOCKER_IMAGE_REPO)-linux-$*:$(DOCKER_IMAGE_TAG)" --help
+
+# docker-manifest push docker manifest to support multiple architectures.
+.PHONY: docker-manifest
+docker-manifest:
+	@echo ">> creating and pushing manifest"
+	@DOCKER_CLI_EXPERIMENTAL=enabled docker manifest create -a "$(DOCKER_IMAGE_REPO):$(DOCKER_IMAGE_TAG)" $(foreach ARCH,$(DOCKER_ARCHS),$(DOCKER_IMAGE_REPO)-linux-$(ARCH):$(DOCKER_IMAGE_TAG))
+	@DOCKER_CLI_EXPERIMENTAL=enabled docker manifest push "$(DOCKER_IMAGE_REPO):$(DOCKER_IMAGE_TAG)"
+
+.PHONY: docker-push $(PUSH_DOCKER_ARCHS)
 docker-push: ## Pushes 'thanos' docker image build to "$(DOCKER_IMAGE_REPO):$(DOCKER_IMAGE_TAG)".
-docker-push:
+docker-push: $(PUSH_DOCKER_ARCHS)
+$(PUSH_DOCKER_ARCHS): docker-push-%:
 	@echo ">> pushing image"
 	@docker tag "thanos" "$(DOCKER_IMAGE_REPO):$(DOCKER_IMAGE_TAG)"
 	@docker push "$(DOCKER_IMAGE_REPO):$(DOCKER_IMAGE_TAG)"
