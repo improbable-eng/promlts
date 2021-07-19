@@ -53,6 +53,7 @@ import (
 	"github.com/thanos-io/thanos/pkg/replicate"
 	"github.com/thanos-io/thanos/pkg/runutil"
 	httpserver "github.com/thanos-io/thanos/pkg/server/http"
+	"github.com/thanos-io/thanos/pkg/store"
 	"github.com/thanos-io/thanos/pkg/ui"
 	"github.com/thanos-io/thanos/pkg/verifier"
 	"golang.org/x/text/language"
@@ -334,6 +335,12 @@ func registerBucketWeb(app extkingpin.AppClause, objStoreConfig *extflag.PathOrC
 	interval := cmd.Flag("refresh", "Refresh interval to download metadata from remote storage").Default("30m").Duration()
 	timeout := cmd.Flag("timeout", "Timeout to download metadata from remote storage").Default("5m").Duration()
 	label := cmd.Flag("label", "Prometheus label to use as timeline title").String()
+	filterConf := &store.FilterConfig{}
+	cmd.Flag("min-time", "Start of time range limit to serve. Thanos tool bucket web will serve only metrics, which happened later than this value. Option can be a constant time in RFC3339 format or time duration relative to current time, such as -1d or 2h45m. Valid duration units are ms, s, m, h, d, w, y.").
+		Default("0000-01-01T00:00:00Z").SetValue(&filterConf.MinTime)
+	cmd.Flag("max-time", "End of time range limit to serve. Thanos tool bucket web will serve only blocks, which happened earlier than this value. Option can be a constant time in RFC3339 format or time duration relative to current time, such as -1d or 2h45m. Valid duration units are ms, s, m, h, d, w, y.").
+		Default("9999-12-31T23:59:59Z").SetValue(&filterConf.MaxTime)
+	selectorRelabelConf := *extkingpin.RegisterSelectorRelabelFlags(cmd)
 
 	cmd.Setup(func(g *run.Group, logger log.Logger, reg *prometheus.Registry, tracer opentracing.Tracer, _ <-chan struct{}, _ bool) error {
 		comp := component.Bucket
@@ -414,8 +421,22 @@ func registerBucketWeb(app extkingpin.AppClause, objStoreConfig *extflag.PathOrC
 			return errors.Wrap(err, "bucket client")
 		}
 
+		relabelContentYaml, err := selectorRelabelConf.Content()
+		if err != nil {
+			return errors.Wrap(err, "get content of relabel configuration")
+		}
+
+		relabelConfig, err := block.ParseRelabelConfig(relabelContentYaml, block.SelectorSupportedRelabelActions)
+		if err != nil {
+			return err
+		}
 		// TODO(bwplotka): Allow Bucket UI to visualize the state of block as well.
-		fetcher, err := block.NewMetaFetcher(logger, block.FetcherConcurrency, bkt, "", extprom.WrapRegistererWithPrefix(extpromPrefix, reg), nil, nil)
+		fetcher, err := block.NewMetaFetcher(logger, block.FetcherConcurrency, bkt, "", extprom.WrapRegistererWithPrefix(extpromPrefix, reg),
+			[]block.MetadataFilter{
+				block.NewTimePartitionMetaFilter(filterConf.MinTime, filterConf.MaxTime),
+				block.NewLabelShardedMetaFilter(relabelConfig),
+				block.NewDeduplicateFilter(),
+			}, nil)
 		if err != nil {
 			return err
 		}
