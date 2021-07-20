@@ -11,12 +11,13 @@ local lower(x) =
 {
   _config+:: {
     runbookURLPattern: 'https://github.com/thanos-io/thanos/tree/main/mixin/runbook.md#alert-name-%s',
+    runbookURLAnchorsToLowercase: true,
   },
 
   prometheusAlerts+::
     local addRunbookURL(rule) = rule {
       [if 'alert' in rule && !('runbook_url' in rule.annotations) then 'annotations']+: {
-        runbook_url: $._config.runbookURLPattern % lower(rule.alert),
+        runbook_url: if $._config.runbookURLAnchorsToLowercase then $._config.runbookURLPattern % lower(rule.alert) else $._config.runbookURLPattern % rule.alert,
       },
     };
     utils.mapRuleGroups(addRunbookURL),
