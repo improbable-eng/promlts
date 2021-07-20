@@ -133,6 +133,7 @@ func runReceive(
 		logger,
 		reg,
 		tracer,
+		0,
 		*conf.grpcCert != "",
 		*conf.grpcClientCA == "",
 		TLSConfig,

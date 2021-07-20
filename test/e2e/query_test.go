@@ -239,7 +239,10 @@ func TestQueryWithEndpointConfig(t *testing.T) {
 
 	endpointConfig := []store.Config{
 		{
-			Endpoints: []string{sidecar1.GRPCNetworkEndpoint(), sidecar2.GRPCNetworkEndpoint(), receiver.GRPCNetworkEndpoint()},
+			Endpoints: []string{sidecar1.GRPCNetworkEndpoint(), receiver.GRPCNetworkEndpoint()},
+		},
+		{
+			Endpoints: []string{sidecar2.GRPCNetworkEndpoint()},
 			EndpointsSD: []file.SDConfig{
 				{
 					Files:           []string{fileSDPath},
