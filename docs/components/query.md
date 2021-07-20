@@ -258,6 +258,18 @@ Query node exposing PromQL enabled Query API with data retrieved from multiple
 store nodes.
 
 Flags:
+      --endpoint.config=<content>  
+                                 Alternative to 'endpoint.config-file' flag
+                                 (mutually exclusive). Content of YAML file that
+                                 contains store API servers configuration.
+                                 Either use this option or separate endpoint
+                                 options (endpoint, endpoint.sd-files,
+                                 endpoint.srict).
+      --endpoint.config-file=<file-path>  
+                                 Path to YAML file that contains store API
+                                 servers configuration. Either use this option
+                                 or separate endpoint options (endpoint,
+                                 endpoint.sd-files, endpoint.srict).
       --grpc-address="0.0.0.0:10901"  
                                  Listen ip:port address for gRPC endpoints
                                  (StoreAPI). Make sure this address is routable

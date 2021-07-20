@@ -22,7 +22,7 @@ import (
 
 type Query struct {
 	*BaseUI
-	storeSet *query.StoreSet
+	storeSets []*query.StoreSet
 
 	externalPrefix, prefixHeader string
 
@@ -32,7 +32,7 @@ type Query struct {
 	now     func() model.Time
 }
 
-func NewQueryUI(logger log.Logger, storeSet *query.StoreSet, externalPrefix, prefixHeader string) *Query {
+func NewQueryUI(logger log.Logger, storeSets []*query.StoreSet, externalPrefix, prefixHeader string) *Query {
 	tmplVariables := map[string]string{
 		"Component": component.Query.String(),
 	}
@@ -43,7 +43,7 @@ func NewQueryUI(logger log.Logger, storeSet *query.StoreSet, externalPrefix, pre
 
 	return &Query{
 		BaseUI:         NewBaseUI(logger, "query_menu.html", tmplFuncs, tmplVariables, externalPrefix, prefixHeader, component.Query),
-		storeSet:       storeSet,
+		storeSets:      storeSets,
 		externalPrefix: externalPrefix,
 		prefixHeader:   prefixHeader,
 		cwd:            runtimeInfo().CWD,
@@ -112,8 +112,10 @@ func (q *Query) status(w http.ResponseWriter, r *http.Request) {
 func (q *Query) stores(w http.ResponseWriter, r *http.Request) {
 	prefix := GetWebPrefix(q.logger, q.externalPrefix, q.prefixHeader, r)
 	statuses := make(map[component.StoreAPI][]query.StoreStatus)
-	for _, status := range q.storeSet.GetStoreStatus() {
-		statuses[status.StoreType] = append(statuses[status.StoreType], status)
+	for _, storesSet := range q.storeSets {
+		for _, status := range storesSet.GetStoreStatus() {
+			statuses[status.StoreType] = append(statuses[status.StoreType], status)
+		}
 	}
 
 	sources := make([]component.StoreAPI, 0, len(statuses))

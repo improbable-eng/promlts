@@ -16,8 +16,6 @@ import (
 	"github.com/cortexproject/cortex/integration/e2e"
 	"github.com/cortexproject/cortex/pkg/util"
 	"github.com/pkg/errors"
-	"github.com/prometheus/common/model"
-	"github.com/prometheus/prometheus/discovery/targetgroup"
 	"github.com/prometheus/prometheus/pkg/relabel"
 	"gopkg.in/yaml.v2"
 
@@ -26,6 +24,7 @@ import (
 	"github.com/thanos-io/thanos/pkg/query"
 	"github.com/thanos-io/thanos/pkg/queryfrontend"
 	"github.com/thanos-io/thanos/pkg/receive"
+	"github.com/thanos-io/thanos/pkg/store"
 )
 
 const infoLogLevel = "info"
@@ -129,13 +128,15 @@ type QuerierBuilder struct {
 	name           string
 	routePrefix    string
 	externalPrefix string
+	fileSDPath     string
 
-	storeAddresses       []string
-	fileSDStoreAddresses []string
-	ruleAddresses        []string
-	metadataAddresses    []string
-	targetAddresses      []string
-	exemplarAddresses    []string
+	storeAddresses    []string
+	ruleAddresses     []string
+	metadataAddresses []string
+	targetAddresses   []string
+	exemplarAddresses []string
+
+	endpointConfig []store.Config
 
 	tracingConfig string
 }
@@ -148,8 +149,8 @@ func NewQuerierBuilder(sharedDir, name string, storeAddresses []string) *Querier
 	}
 }
 
-func (q *QuerierBuilder) WithFileSDStoreAddresses(fileSDStoreAddresses []string) *QuerierBuilder {
-	q.fileSDStoreAddresses = fileSDStoreAddresses
+func (q *QuerierBuilder) WithFileSDStoreAddresses(fileSDPath string) *QuerierBuilder {
+	q.fileSDPath = fileSDPath
 	return q
 }
 
@@ -188,6 +189,11 @@ func (q *QuerierBuilder) WithTracingConfig(tracingConfig string) *QuerierBuilder
 	return q
 }
 
+func (q *QuerierBuilder) WithEndpointConfig(endpointConfig []store.Config) *QuerierBuilder {
+	q.endpointConfig = endpointConfig
+	return q
+}
+
 func (q *QuerierBuilder) Build() (*Service, error) {
 	const replicaLabel = "replica"
 
@@ -222,28 +228,8 @@ func (q *QuerierBuilder) Build() (*Service, error) {
 		args = append(args, "--exemplar="+addr)
 	}
 
-	if len(q.fileSDStoreAddresses) > 0 {
-		queryFileSDDir := filepath.Join(q.sharedDir, "data", "querier", q.name)
-		container := filepath.Join(e2e.ContainerSharedDir, "data", "querier", q.name)
-		if err := os.MkdirAll(queryFileSDDir, 0750); err != nil {
-			return nil, errors.Wrap(err, "create query dir failed")
-		}
-
-		fileSD := []*targetgroup.Group{{}}
-		for _, a := range q.fileSDStoreAddresses {
-			fileSD[0].Targets = append(fileSD[0].Targets, model.LabelSet{model.AddressLabel: model.LabelValue(a)})
-		}
-
-		b, err := yaml.Marshal(fileSD)
-		if err != nil {
-			return nil, err
-		}
-
-		if err := ioutil.WriteFile(queryFileSDDir+"/filesd.yaml", b, 0600); err != nil {
-			return nil, errors.Wrap(err, "creating query SD config failed")
-		}
-
-		args = append(args, "--store.sd-files="+filepath.Join(container, "filesd.yaml"))
+	if q.fileSDPath != "" {
+		args = append(args, "--store.sd-files="+q.fileSDPath)
 	}
 
 	if q.routePrefix != "" {
@@ -256,6 +242,14 @@ func (q *QuerierBuilder) Build() (*Service, error) {
 
 	if q.tracingConfig != "" {
 		args = append(args, "--tracing.config="+q.tracingConfig)
+	}
+
+	if (len(q.storeAddresses) == 0 && q.fileSDPath == "") && len(q.endpointConfig) > 0 {
+		endpointCfgBytes, err := yaml.Marshal(q.endpointConfig)
+		if err != nil {
+			return nil, errors.Wrapf(err, "generate endpoint config file: %v", q.endpointConfig)
+		}
+		args = append(args, "--endpoint.config="+string(endpointCfgBytes))
 	}
 
 	querier := NewService(

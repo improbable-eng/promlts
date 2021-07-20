@@ -186,7 +186,7 @@ func TestStoreSet_Update(t *testing.T) {
 
 	// Testing if duplicates can cause weird results.
 	discoveredStoreAddr = append(discoveredStoreAddr, discoveredStoreAddr[0])
-	storeSet := NewStoreSet(nil, nil,
+	storeSet := NewStoreSet(nil, nil, 0,
 		func() (specs []StoreSpec) {
 			for _, addr := range discoveredStoreAddr {
 				specs = append(specs, NewGRPCStoreSpec(addr, false))
@@ -546,7 +546,7 @@ func TestStoreSet_Update_NoneAvailable(t *testing.T) {
 	st.CloseOne(initialStoreAddr[0])
 	st.CloseOne(initialStoreAddr[1])
 
-	storeSet := NewStoreSet(nil, nil,
+	storeSet := NewStoreSet(nil, nil, 0,
 		func() (specs []StoreSpec) {
 			for _, addr := range initialStoreAddr {
 				specs = append(specs, NewGRPCStoreSpec(addr, false))
@@ -634,7 +634,7 @@ func TestQuerierStrict(t *testing.T) {
 
 	staticStoreAddr := st.StoreAddresses()[0]
 	slowStaticStoreAddr := st.StoreAddresses()[2]
-	storeSet := NewStoreSet(nil, nil, func() (specs []StoreSpec) {
+	storeSet := NewStoreSet(nil, nil, 0, func() (specs []StoreSpec) {
 		return []StoreSpec{
 			NewGRPCStoreSpec(st.StoreAddresses()[0], true),
 			NewGRPCStoreSpec(st.StoreAddresses()[1], false),
@@ -796,7 +796,7 @@ func TestStoreSet_Update_Rules(t *testing.T) {
 			expectedRules:  2,
 		},
 	} {
-		storeSet := NewStoreSet(nil, nil,
+		storeSet := NewStoreSet(nil, nil, 0,
 			tc.storeSpecs,
 			tc.ruleSpecs,
 			func() []TargetSpec { return nil },
@@ -959,7 +959,7 @@ func TestStoreSet_Rules_Discovery(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			currentState := 0
 
-			storeSet := NewStoreSet(nil, nil,
+			storeSet := NewStoreSet(nil, nil, 0,
 				func() []StoreSpec {
 					if tc.states[currentState].storeSpecs == nil {
 						return nil

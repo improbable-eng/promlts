@@ -143,13 +143,13 @@ type storeSetNodeCollector struct {
 	connectionsDesc *prometheus.Desc
 }
 
-func newStoreSetNodeCollector() *storeSetNodeCollector {
+func newStoreSetNodeCollector(configInstance string) *storeSetNodeCollector {
 	return &storeSetNodeCollector{
 		storeNodes: map[component.StoreAPI]map[string]int{},
 		connectionsDesc: prometheus.NewDesc(
 			"thanos_store_nodes_grpc_connections",
 			"Number of gRPC connection to Store APIs. Opened connection means healthy store APIs available for Querier.",
-			[]string{"external_labels", "store_type"}, nil,
+			[]string{"external_labels", "store_type"}, map[string]string{"config_instance": configInstance},
 		),
 	}
 }
@@ -223,6 +223,7 @@ type StoreSet struct {
 func NewStoreSet(
 	logger log.Logger,
 	reg *prometheus.Registry,
+	instance int,
 	storeSpecs func() []StoreSpec,
 	ruleSpecs func() []RuleSpec,
 	targetSpecs func() []TargetSpec,
@@ -231,7 +232,7 @@ func NewStoreSet(
 	dialOpts []grpc.DialOption,
 	unhealthyStoreTimeout time.Duration,
 ) *StoreSet {
-	storesMetric := newStoreSetNodeCollector()
+	storesMetric := newStoreSetNodeCollector(string(rune(instance)))
 	if reg != nil {
 		reg.MustRegister(storesMetric)
 	}
