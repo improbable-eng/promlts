@@ -92,6 +92,7 @@ func TestRulesAPI_Fanout(t *testing.T) {
 	r2, err = e2ethanos.NewRuler(s.SharedDir(), "rule2", thanosRulesSubDir, nil, queryCfg)
 	testutil.Ok(t, err)
 	testutil.Ok(t, s.StartAndWaitReady(r1, r2))
+	time.Sleep(40 * time.Minute)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
 	t.Cleanup(cancel)

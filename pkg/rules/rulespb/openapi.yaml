@@ -1,0 +1,124 @@
+# Generated with protoc-gen-openapi
+# https://github.com/googleapis/gnostic/tree/master/apps/protoc-gen-openapi
+
+openapi: 3.0.3
+info:
+    title: Rules
+    description: / Rules represents API that is responsible for gathering rules and their statuses.
+    version: 0.0.1
+paths:
+    alerts:
+        get:
+            summary: / Gets a rule alerting.
+            operationId: Rules_RulesAlert
+            parameters:
+                - name: type
+                  in: query
+                  description: / The type to request.
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Alert'
+    rules:
+        get:
+            summary: / Gets a rule recording.
+            operationId: Rules_RulesRecord
+            parameters:
+                - name: type
+                  in: query
+                  description: / The type to request.
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/RecordingRule'
+components:
+    schemas:
+        Alert:
+            properties:
+                state:
+                    type: integer
+                    description: / state returns the maximum state of alert instances for this rule.
+                    format: enum
+                name:
+                    type: string
+                query:
+                    type: string
+                duration_seconds:
+                    type: number
+                    format: double
+                labels:
+                    $ref: '#/components/schemas/ZLabelSet'
+                annotations:
+                    $ref: '#/components/schemas/ZLabelSet'
+                alerts:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/AlertInstance'
+                health:
+                    type: string
+                last_error:
+                    type: string
+                evaluation_duration_seconds:
+                    type: number
+                    format: double
+                last_evaluation:
+                    type: string
+                    format: RFC3339
+        AlertInstance:
+            properties:
+                labels:
+                    $ref: '#/components/schemas/ZLabelSet'
+                annotations:
+                    $ref: '#/components/schemas/ZLabelSet'
+                state:
+                    type: integer
+                    format: enum
+                active_at:
+                    type: string
+                    format: RFC3339
+                value:
+                    type: string
+                PartialResponseStrategy:
+                    type: integer
+                    description: Thanos specific. Used mainly for alert API purposes.
+                    format: enum
+        Label:
+            properties:
+                name:
+                    type: string
+                value:
+                    type: string
+        RecordingRule:
+            properties:
+                name:
+                    type: string
+                query:
+                    type: string
+                labels:
+                    $ref: '#/components/schemas/ZLabelSet'
+                health:
+                    type: string
+                last_error:
+                    type: string
+                evaluation_duration_seconds:
+                    type: number
+                    format: double
+                last_evaluation:
+                    type: string
+                    format: RFC3339
+        ZLabelSet:
+            properties:
+                labels:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/Label'
