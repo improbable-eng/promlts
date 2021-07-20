@@ -41,6 +41,8 @@ type streamedBlockWriter struct {
 	closers     []io.Closer
 
 	seriesRefs uint64 // postings is a current posting position.
+
+	chksBuf []chunks.Meta
 }
 
 // NewStreamedBlockWriter returns streamedBlockWriter instance, it's not concurrency safe.
@@ -100,36 +102,45 @@ func NewStreamedBlockWriter(
 		chunkWriter: chunkWriter,
 		meta:        originMeta,
 		closers:     closers,
+		chksBuf:     make([]chunks.Meta, 0),
 	}, nil
 }
 
 // WriteSeries writes chunks data to the chunkWriter, writes lset and chunks MetasFetcher to indexWrites and adds label sets to
 // labelsValues sets and memPostings to be written on the finalize state in the end of downsampling process.
-func (w *streamedBlockWriter) WriteSeries(lset labels.Labels, chunks []chunks.Meta) error {
+func (w *streamedBlockWriter) WriteSeries(lset labels.Labels, chksIter chunks.Iterator) error {
 	if w.finalized || w.ignoreFinalize {
 		return errors.New("series can't be added, writers has been closed or internal error happened")
 	}
 
-	if len(chunks) == 0 {
+	w.chksBuf = w.chksBuf[:0]
+	for chksIter.Next() {
+		w.chksBuf = append(w.chksBuf, chksIter.At())
+	}
+	if err := chksIter.Err(); err != nil {
+		return err
+	}
+
+	if len(w.chksBuf) == 0 {
 		level.Warn(w.logger).Log("msg", "empty chunks happened, skip series", "series", strings.ReplaceAll(lset.String(), "\"", "'"))
 		return nil
 	}
 
-	if err := w.chunkWriter.WriteChunks(chunks...); err != nil {
+	if err := w.chunkWriter.WriteChunks(w.chksBuf...); err != nil {
 		w.ignoreFinalize = true
 		return errors.Wrap(err, "add chunks")
 	}
 
-	if err := w.indexWriter.AddSeries(w.seriesRefs, lset, chunks...); err != nil {
+	if err := w.indexWriter.AddSeries(w.seriesRefs, lset, w.chksBuf...); err != nil {
 		w.ignoreFinalize = true
 		return errors.Wrap(err, "add series")
 	}
 
 	w.seriesRefs++
 
-	w.totalChunks += uint64(len(chunks))
-	for i := range chunks {
-		w.totalSamples += uint64(chunks[i].Chunk.NumSamples())
+	w.totalChunks += uint64(len(w.chksBuf))
+	for i := range w.chksBuf {
+		w.totalSamples += uint64(w.chksBuf[i].Chunk.NumSamples())
 	}
 
 	return nil

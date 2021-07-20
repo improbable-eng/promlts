@@ -34,13 +34,14 @@ func TestMain(m *testing.M) {
 }
 
 func TestDownsampleCounterBoundaryReset(t *testing.T) {
-	toAggrChunks := func(t *testing.T, cm []chunks.Meta) (res []*AggrChunk) {
-		for i := range cm {
-			achk, ok := cm[i].Chunk.(*AggrChunk)
+	toAggrChunks := func(t *testing.T, it chunks.Iterator) (res []*AggrChunk, err error) {
+		for it.Next() {
+			achk, ok := it.At().Chunk.(*AggrChunk)
 			testutil.Assert(t, ok, "expected *AggrChunk")
 			res = append(res, achk)
 		}
-		return
+
+		return res, it.Err()
 	}
 
 	counterSamples := func(t *testing.T, achks []*AggrChunk) (res []sample) {
@@ -74,7 +75,7 @@ func TestDownsampleCounterBoundaryReset(t *testing.T) {
 	}
 
 	type test struct {
-		raw                   []sample
+		raw                   []chunks.Meta
 		rawAggrResolution     int64
 		expectedRawAggrChunks int
 		rawCounterSamples     []sample
@@ -94,11 +95,13 @@ func TestDownsampleCounterBoundaryReset(t *testing.T) {
 			// will only be accounted for if the first raw value
 			// of a chunk is maintained during aggregation.
 			// See #1568 for more details.
-			raw: []sample{
-				{t: 10, v: 1}, {t: 20, v: 3}, {t: 30, v: 5},
-				{t: 50, v: 1}, {t: 60, v: 8}, {t: 70, v: 10},
-				{t: 120, v: 1}, {t: 130, v: 18}, {t: 140, v: 20},
-				{t: 160, v: 21}, {t: 170, v: 38}, {t: 180, v: 40},
+			raw: []chunks.Meta{
+				tsdbutil.ChunkFromSamples([]tsdbutil.Sample{
+					sample{10, 1}, sample{20, 3}, sample{30, 5},
+					sample{50, 1}, sample{60, 8}, sample{70, 10},
+					sample{120, 1}, sample{130, 18}, sample{140, 20},
+					sample{160, 21}, sample{170, 38}, sample{180, 40},
+				}),
 			},
 			rawAggrResolution:     50,
 			expectedRawAggrChunks: 4,
@@ -128,21 +131,22 @@ func TestDownsampleCounterBoundaryReset(t *testing.T) {
 	}
 
 	doTest := func(t *testing.T, test *test) {
-		// Asking for more chunks than raw samples ensures that downsampleRawLoop
-		// will create chunks with samples from a single window.
-		cm := downsampleRawLoop(test.raw, test.rawAggrResolution, len(test.raw)+1)
-		testutil.Equals(t, test.expectedRawAggrChunks, len(cm))
-
-		rawAggrChunks := toAggrChunks(t, cm)
+		var (
+			buf     []sample
+			reuseIt chunkenc.Iterator
+		)
+		cmIt := newDownsampleRawIterator(test.raw, &buf, reuseIt, 1, test.rawAggrResolution)
+		rawAggrChunks, err := toAggrChunks(t, cmIt)
+		testutil.Ok(t, err)
+		testutil.Equals(t, test.expectedRawAggrChunks, len(rawAggrChunks))
 		testutil.Equals(t, test.rawCounterSamples, counterSamples(t, rawAggrChunks))
 		testutil.Equals(t, test.rawCounterIterate, counterIterate(t, rawAggrChunks))
 
-		var buf []sample
-		acm, err := downsampleAggrLoop(rawAggrChunks, &buf, test.aggrAggrResolution, test.aggrChunks)
-		testutil.Ok(t, err)
-		testutil.Equals(t, test.aggrChunks, len(acm))
+		acmIt := newDownsampleAggrIterator(rawAggrChunks, &buf, reuseIt, len(rawAggrChunks)/test.aggrChunks, test.aggrAggrResolution)
 
-		aggrAggrChunks := toAggrChunks(t, acm)
+		aggrAggrChunks, err := toAggrChunks(t, acmIt)
+		testutil.Ok(t, err)
+		testutil.Equals(t, test.aggrChunks, len(aggrAggrChunks))
 		testutil.Equals(t, test.aggrCounterSamples, counterSamples(t, aggrAggrChunks))
 		testutil.Equals(t, test.aggrCounterIterate, counterIterate(t, aggrAggrChunks))
 	}
