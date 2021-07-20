@@ -791,6 +791,32 @@ func (c *Client) MetricMetadataInGRPC(ctx context.Context, base *url.URL, metric
 	return v.Data, c.get2xxResultWithGRPCErrors(ctx, "/prom_metric_metadata HTTP[client]", &u, &v)
 }
 
+// TargetMetadataInGRPC returns the metadata from Prometheus targets metadata API. It uses gRPC errors.
+func (c *Client) TargetMetadataInGRPC(ctx context.Context, base *url.URL, matchTarget, metric string, limit int) ([]*metadatapb.TargetMetadata, error) {
+	u := *base
+	u.Path = path.Join(u.Path, "/api/v1/targets/metadata")
+	q := u.Query()
+
+	if matchTarget != "" {
+		q.Add("match_target", matchTarget)
+	}
+
+	if metric != "" {
+		q.Add("metric", metric)
+	}
+	// We only set limit when it is >= 0.
+	if limit >= 0 {
+		q.Add("limit", strconv.Itoa(limit))
+	}
+
+	u.RawQuery = q.Encode()
+
+	var v struct {
+		Data []*metadatapb.TargetMetadata `json:"data"`
+	}
+	return v.Data, c.get2xxResultWithGRPCErrors(ctx, "/prom_target_metadata HTTP[client]", &u, &v)
+}
+
 // ExemplarsInGRPC returns the exemplars from Prometheus exemplars API. It uses gRPC errors.
 // NOTE: This method is tested in pkg/store/prometheus_test.go against Prometheus.
 func (c *Client) ExemplarsInGRPC(ctx context.Context, base *url.URL, query string, startTime, endTime int64) ([]*exemplarspb.ExemplarData, error) {

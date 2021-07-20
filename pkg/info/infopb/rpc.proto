@@ -58,8 +58,12 @@ message StoreInfo {
 message RulesInfo {
 }
 
-/// MetricMetadataInfo holds the metadata related to Metadata API exposed by the component.
+/// MetricMetadataInfo holds the metadata related to Metric Metadata API exposed by the component.
 message MetricMetadataInfo {
+}
+
+/// TargetMetadataInfo holds the metadata related to Target Metadata API exposed by the component.
+message TargetMetadataInfo {
 }
 
 /// TargetsInfo holds the metadata related to Targets API exposed by the component.

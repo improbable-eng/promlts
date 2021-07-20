@@ -33,9 +33,27 @@ func (p *Prometheus) MetricMetadata(r *metadatapb.MetricMetadataRequest, s metad
 		return err
 	}
 
-	tracing.DoInSpan(s.Context(), "send_metadata_response", func(_ context.Context) {
+	tracing.DoInSpan(s.Context(), "send_metric_metadata_response", func(_ context.Context) {
 		err = s.Send(&metadatapb.MetricMetadataResponse{Result: &metadatapb.MetricMetadataResponse_Metadata{
 			Metadata: metadatapb.FromMetadataMap(md)}})
 	})
+	return err
+}
+
+// TargetMetadata returns all specified target metadata from Prometheus.
+func (p *Prometheus) TargetMetadata(r *metadatapb.TargetMetadataRequest, s metadatapb.Metadata_TargetMetadataServer) error {
+	targetsMetadata, err := p.client.TargetMetadataInGRPC(s.Context(), p.base, r.MatchTarget, r.Metric, int(r.Limit))
+	if err != nil {
+		return err
+	}
+
+	for _, targetMetadata := range targetsMetadata {
+		tracing.DoInSpan(s.Context(), "send_target_metadata_response", func(_ context.Context) {
+			err = s.Send(&metadatapb.TargetMetadataResponse{
+				Result: &metadatapb.TargetMetadataResponse_Data{Data: targetMetadata},
+			})
+		})
+	}
+
 	return err
 }

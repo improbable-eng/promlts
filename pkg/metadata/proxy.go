@@ -5,6 +5,7 @@ package metadata
 
 import (
 	"context"
+	"fmt"
 	"io"
 
 	"github.com/go-kit/kit/log"
@@ -41,7 +42,7 @@ func NewProxy(logger log.Logger, metadata func() []metadatapb.MetadataClient) *P
 }
 
 func (s *Proxy) MetricMetadata(req *metadatapb.MetricMetadataRequest, srv metadatapb.Metadata_MetricMetadataServer) error {
-	span, ctx := tracing.StartSpan(srv.Context(), "proxy_metadata")
+	span, ctx := tracing.StartSpan(srv.Context(), "proxy_metric_metadata")
 	defer span.Finish()
 
 	var (
@@ -76,11 +77,59 @@ func (s *Proxy) MetricMetadata(req *metadatapb.MetricMetadataRequest, srv metada
 	}
 
 	for _, t := range metas {
-		tracing.DoInSpan(srv.Context(), "send_metadata_response", func(_ context.Context) {
+		tracing.DoInSpan(srv.Context(), "send_metric_metadata_response", func(_ context.Context) {
 			err = srv.Send(metadatapb.NewMetricMetadataResponse(t))
 		})
 		if err != nil {
 			return status.Error(codes.Unknown, errors.Wrap(err, "send metric metadata response").Error())
+		}
+	}
+
+	return nil
+}
+
+func (s *Proxy) TargetMetadata(req *metadatapb.TargetMetadataRequest, srv metadatapb.Metadata_TargetMetadataServer) error {
+	span, ctx := tracing.StartSpan(srv.Context(), "proxy_target_metadata")
+	defer span.Finish()
+
+	var (
+		g, gctx         = errgroup.WithContext(ctx)
+		respChan        = make(chan *metadatapb.TargetMetadata, 10)
+		deDupedMetadata = make(map[string]*metadatapb.TargetMetadata)
+		err             error
+	)
+
+	for _, metadataClient := range s.metadata() {
+		rs := &targetMetadataStream{
+			client:  metadataClient,
+			request: req,
+			channel: respChan,
+			server:  srv,
+		}
+		g.Go(func() error { return rs.receive(gctx) })
+	}
+
+	go func() {
+		_ = g.Wait()
+		close(respChan)
+	}()
+
+	for resp := range respChan {
+		key := fmt.Sprintf("%s_%s_%s", resp.Target.Job, resp.Target.Instance, resp.Metric)
+		deDupedMetadata[key] = resp
+	}
+
+	if err := g.Wait(); err != nil {
+		level.Error(s.logger).Log("err:proxy_target_metadata", err)
+		return err
+	}
+
+	for _, meta := range deDupedMetadata {
+		tracing.DoInSpan(srv.Context(), "send_target_metadata_response", func(_ context.Context) {
+			err = srv.Send(metadatapb.NewTargetMetadataResponse(meta))
+		})
+		if err != nil {
+			return status.Error(codes.Unknown, errors.Wrap(err, "send target metadata response").Error())
 		}
 	}
 
@@ -100,7 +149,7 @@ func (stream *metricMetadataStream) receive(ctx context.Context) error {
 		metadataCli metadatapb.Metadata_MetricMetadataClient
 	)
 
-	tracing.DoInSpan(ctx, "receive_metadata_stream_request", func(ctx context.Context) {
+	tracing.DoInSpan(ctx, "receive_metric_metadata_stream_request", func(ctx context.Context) {
 		metadataCli, err = stream.client.MetricMetadata(ctx, stream.request)
 	})
 
@@ -111,7 +160,7 @@ func (stream *metricMetadataStream) receive(ctx context.Context) error {
 			return err
 		}
 
-		if serr := stream.server.Send(metadatapb.NewWarningMetadataResponse(err)); serr != nil {
+		if serr := stream.server.Send(metadatapb.NewWarningMetricMetadataResponse(err)); serr != nil {
 			return serr
 		}
 		// Not an error if response strategy is warning.
@@ -131,22 +180,88 @@ func (stream *metricMetadataStream) receive(ctx context.Context) error {
 				return err
 			}
 
-			if err := stream.server.Send(metadatapb.NewWarningMetadataResponse(err)); err != nil {
-				return errors.Wrapf(err, "sending metadata error to server %v", stream.server)
+			if err := stream.server.Send(metadatapb.NewWarningMetricMetadataResponse(err)); err != nil {
+				return errors.Wrapf(err, "sending metric metadata error to server %v", stream.server)
 			}
 
 			continue
 		}
 
 		if w := resp.GetWarning(); w != "" {
-			if err := stream.server.Send(metadatapb.NewWarningMetadataResponse(errors.New(w))); err != nil {
-				return errors.Wrapf(err, "sending metadata warning to server %v", stream.server)
+			if err := stream.server.Send(metadatapb.NewWarningMetricMetadataResponse(errors.New(w))); err != nil {
+				return errors.Wrapf(err, "sending metric metadata warning to server %v", stream.server)
 			}
 			continue
 		}
 
 		select {
 		case stream.channel <- resp.GetMetadata():
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+}
+
+type targetMetadataStream struct {
+	client  metadatapb.MetadataClient
+	request *metadatapb.TargetMetadataRequest
+	channel chan<- *metadatapb.TargetMetadata
+	server  metadatapb.Metadata_TargetMetadataServer
+}
+
+func (stream *targetMetadataStream) receive(ctx context.Context) error {
+	var (
+		err         error
+		metadataCli metadatapb.Metadata_TargetMetadataClient
+	)
+
+	tracing.DoInSpan(ctx, "receive_target_metadata_stream_request", func(ctx context.Context) {
+		metadataCli, err = stream.client.TargetMetadata(ctx, stream.request)
+	})
+
+	if err != nil {
+		err = errors.Wrapf(err, "fetching target metadata from metadata client %v", stream.client)
+
+		if stream.request.PartialResponseStrategy == storepb.PartialResponseStrategy_ABORT {
+			return err
+		}
+
+		if serr := stream.server.Send(metadatapb.NewWarningTargetMetadataResponse(err)); serr != nil {
+			return serr
+		}
+		// Not an error if response strategy is warning.
+		return nil
+	}
+
+	for {
+		resp, err := metadataCli.Recv()
+		if err == io.EOF {
+			return nil
+		}
+
+		if err != nil {
+			err = errors.Wrapf(err, "receiving target metadata from metadata client %v", stream.client)
+
+			if stream.request.PartialResponseStrategy == storepb.PartialResponseStrategy_ABORT {
+				return err
+			}
+
+			if err := stream.server.Send(metadatapb.NewWarningTargetMetadataResponse(err)); err != nil {
+				return errors.Wrapf(err, "sending target metadata error to server %v", stream.server)
+			}
+
+			continue
+		}
+
+		if w := resp.GetWarning(); w != "" {
+			if err := stream.server.Send(metadatapb.NewWarningTargetMetadataResponse(errors.New(w))); err != nil {
+				return errors.Wrapf(err, "sending target metadata warning to server %v", stream.server)
+			}
+			continue
+		}
+
+		select {
+		case stream.channel <- resp.GetData():
 		case <-ctx.Done():
 			return ctx.Err()
 		}

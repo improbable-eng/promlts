@@ -18,6 +18,7 @@ var _ UnaryClient = &GRPCClient{}
 // support streaming.
 type UnaryClient interface {
 	MetricMetadata(ctx context.Context, req *metadatapb.MetricMetadataRequest) (map[string][]metadatapb.Meta, storage.Warnings, error)
+	TargetMetadata(ctx context.Context, req *metadatapb.TargetMetadataRequest) ([]*metadatapb.TargetMetadata, storage.Warnings, error)
 }
 
 // GRPCClient allows to retrieve metadata from local gRPC streaming server implementation.
@@ -33,10 +34,10 @@ func NewGRPCClient(ts metadatapb.MetadataServer) *GRPCClient {
 }
 
 func (rr *GRPCClient) MetricMetadata(ctx context.Context, req *metadatapb.MetricMetadataRequest) (map[string][]metadatapb.Meta, storage.Warnings, error) {
-	span, ctx := tracing.StartSpan(ctx, "metadata_grpc_request")
+	span, ctx := tracing.StartSpan(ctx, "metric_metadata_grpc_request")
 	defer span.Finish()
 
-	srv := &metadataServer{ctx: ctx, metric: req.Metric, limit: int(req.Limit)}
+	srv := &metricMetadataServer{ctx: ctx, metric: req.Metric, limit: int(req.Limit)}
 
 	if req.Limit >= 0 {
 		if req.Metric != "" {
@@ -57,7 +58,20 @@ func (rr *GRPCClient) MetricMetadata(ctx context.Context, req *metadatapb.Metric
 	return srv.metadataMap, srv.warnings, nil
 }
 
-type metadataServer struct {
+func (rr *GRPCClient) TargetMetadata(ctx context.Context, req *metadatapb.TargetMetadataRequest) ([]*metadatapb.TargetMetadata, storage.Warnings, error) {
+	span, ctx := tracing.StartSpan(ctx, "target_metadata_grpc_request")
+	defer span.Finish()
+
+	srv := &targetMetadataServer{ctx: ctx, metric: req.Metric, limit: int(req.Limit), target: req.MatchTarget}
+
+	if err := rr.proxy.TargetMetadata(req, srv); err != nil {
+		return nil, nil, errors.Wrap(err, "proxy TargetMetadata")
+	}
+
+	return srv.metadata, srv.warnings, nil
+}
+
+type metricMetadataServer struct {
 	// This field just exist to pseudo-implement the unused methods of the interface.
 	metadatapb.Metadata_MetricMetadataServer
 	ctx context.Context
@@ -69,7 +83,7 @@ type metadataServer struct {
 	metadataMap map[string][]metadatapb.Meta
 }
 
-func (srv *metadataServer) Send(res *metadatapb.MetricMetadataResponse) error {
+func (srv *metricMetadataServer) Send(res *metadatapb.MetricMetadataResponse) error {
 	if res.GetWarning() != "" {
 		srv.warnings = append(srv.warnings, errors.New(res.GetWarning()))
 		return nil
@@ -107,6 +121,42 @@ func (srv *metadataServer) Send(res *metadatapb.MetricMetadataResponse) error {
 	return nil
 }
 
-func (srv *metadataServer) Context() context.Context {
+func (srv *metricMetadataServer) Context() context.Context {
+	return srv.ctx
+}
+
+type targetMetadataServer struct {
+	// This field just exist to pseudo-implement the unused methods of the interface.
+	metadatapb.Metadata_TargetMetadataServer
+	ctx context.Context
+
+	metric string
+	limit  int
+	target string
+
+	warnings []error
+	metadata []*metadatapb.TargetMetadata
+}
+
+func (srv *targetMetadataServer) Send(res *metadatapb.TargetMetadataResponse) error {
+	if res.GetWarning() != "" {
+		srv.warnings = append(srv.warnings, errors.New(res.GetWarning()))
+		return nil
+	}
+
+	if res.GetData() == nil {
+		return errors.New("no target metadata")
+	}
+
+	// If limit is set to 0, we don't need to add anything.
+	if srv.limit == 0 {
+		return nil
+	}
+
+	srv.metadata = append(srv.metadata, res.GetData())
+	return nil
+}
+
+func (srv *targetMetadataServer) Context() context.Context {
 	return srv.ctx
 }

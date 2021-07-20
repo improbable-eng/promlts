@@ -184,7 +184,8 @@ func (qapi *QueryAPI) Register(r *route.Router, tracer opentracing.Tracer, logge
 
 	r.Get("/targets", instr("targets", NewTargetsHandler(qapi.targets, qapi.enableTargetPartialResponse)))
 
-	r.Get("/metadata", instr("metadata", NewMetricMetadataHandler(qapi.metadatas, qapi.enableMetricMetadataPartialResponse)))
+	r.Get("/metadata", instr("metric_metadata", NewMetricMetadataHandler(qapi.metadatas, qapi.enableMetricMetadataPartialResponse)))
+	r.Get("/targets/metadata", instr("target_metadata", NewTargetMetadataHandler(qapi.metadatas, qapi.enableMetricMetadataPartialResponse)))
 
 	r.Get("/query_exemplars", instr("exemplars", NewExemplarsHandler(qapi.exemplars, qapi.enableExemplarPartialResponse)))
 	r.Post("/query_exemplars", instr("exemplars", NewExemplarsHandler(qapi.exemplars, qapi.enableExemplarPartialResponse)))
@@ -934,7 +935,7 @@ func NewMetricMetadataHandler(client metadata.UnaryClient, enablePartialResponse
 	}
 
 	return func(r *http.Request) (interface{}, []error, *api.ApiError) {
-		span, ctx := tracing.StartSpan(r.Context(), "metadata_http_request")
+		span, ctx := tracing.StartSpan(r.Context(), "metric_metadata_http_request")
 		defer span.Finish()
 
 		var (
@@ -944,28 +945,80 @@ func NewMetricMetadataHandler(client metadata.UnaryClient, enablePartialResponse
 		)
 
 		req := &metadatapb.MetricMetadataRequest{
-			// By default we use -1, which means no limit.
-			Limit:                   -1,
 			Metric:                  r.URL.Query().Get("metric"),
 			PartialResponseStrategy: ps,
 		}
 
-		limitStr := r.URL.Query().Get("limit")
-		if limitStr != "" {
-			limit, err := strconv.ParseInt(limitStr, 10, 32)
-			if err != nil {
-				return nil, nil, &api.ApiError{Typ: api.ErrorBadData, Err: errors.Errorf("invalid metric metadata limit='%v'", limit)}
-			}
-			req.Limit = int32(limit)
+		limit, apiErr := limitFromStr(r.URL.Query().Get("limit"))
+		if apiErr != nil {
+			return nil, nil, apiErr
 		}
+		req.Limit = limit
 
-		tracing.DoInSpan(ctx, "retrieve_metadata", func(ctx context.Context) {
+		tracing.DoInSpan(ctx, "retrieve_metric_metadata", func(ctx context.Context) {
 			t, warnings, err = client.MetricMetadata(ctx, req)
 		})
 		if err != nil {
-			return nil, nil, &api.ApiError{Typ: api.ErrorInternal, Err: errors.Wrap(err, "retrieving metadata")}
+			return nil, nil, &api.ApiError{Typ: api.ErrorInternal, Err: errors.Wrap(err, "retrieving metric metadata")}
 		}
 
 		return t, warnings, nil
 	}
+}
+
+// NewTargetMetadataHandler creates handler compatible with HTTP
+// /api/v1/targets/metadata https://prometheus.io/docs/prometheus/latest/querying/api/#querying-target-metadata
+// which uses gRPC Unary Metadata API.
+func NewTargetMetadataHandler(client metadata.UnaryClient, enablePartialResponse bool) func(*http.Request) (interface{}, []error, *api.ApiError) {
+	ps := storepb.PartialResponseStrategy_ABORT
+	if enablePartialResponse {
+		ps = storepb.PartialResponseStrategy_WARN
+	}
+
+	return func(r *http.Request) (interface{}, []error, *api.ApiError) {
+		span, ctx := tracing.StartSpan(r.Context(), "target_metadata_http_request")
+		defer span.Finish()
+
+		var (
+			targetsMetadata []*metadatapb.TargetMetadata
+			warnings        storage.Warnings
+			err             error
+		)
+
+		req := &metadatapb.TargetMetadataRequest{
+			// By default empty match_target will match all targets
+			MatchTarget:             r.URL.Query().Get("match_target"),
+			Metric:                  r.URL.Query().Get("metric"),
+			PartialResponseStrategy: ps,
+		}
+
+		limit, apiErr := limitFromStr(r.URL.Query().Get("limit"))
+		if err != nil {
+			return nil, nil, apiErr
+		}
+		req.Limit = limit
+
+		tracing.DoInSpan(ctx, "retrieve_target_metadata", func(ctx context.Context) {
+			targetsMetadata, warnings, err = client.TargetMetadata(ctx, req)
+		})
+		if err != nil {
+			return nil, nil, &api.ApiError{Typ: api.ErrorInternal, Err: errors.Wrap(err, "retrieving target metadata")}
+		}
+
+		return targetsMetadata, warnings, nil
+	}
+}
+
+// Defaults to use -1, which means no limit or parse the provided limit.
+func limitFromStr(limit string) (int32, *api.ApiError) {
+	defaultLimit := int32(-1)
+	if limit == "" {
+		return defaultLimit, nil
+	}
+
+	l, err := strconv.ParseInt(limit, 10, 32)
+	if err != nil {
+		return defaultLimit, &api.ApiError{Typ: api.ErrorBadData, Err: errors.Errorf("invalid metadata limit='%v'", limit)}
+	}
+	return int32(l), nil
 }
