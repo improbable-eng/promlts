@@ -266,6 +266,214 @@ func (m *Meta) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_Meta proto.InternalMessageInfo
 
+type Target struct {
+	Instance string `protobuf:"bytes,1,opt,name=instance,proto3" json:"instance"`
+	Job      string `protobuf:"bytes,2,opt,name=job,proto3" json:"job"`
+}
+
+func (m *Target) Reset()         { *m = Target{} }
+func (m *Target) String() string { return proto.CompactTextString(m) }
+func (*Target) ProtoMessage()    {}
+func (*Target) Descriptor() ([]byte, []int) {
+	return fileDescriptor_1d9ae5661e0dc3fc, []int{5}
+}
+func (m *Target) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *Target) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_Target.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *Target) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_Target.Merge(m, src)
+}
+func (m *Target) XXX_Size() int {
+	return m.Size()
+}
+func (m *Target) XXX_DiscardUnknown() {
+	xxx_messageInfo_Target.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_Target proto.InternalMessageInfo
+
+type TargetMetadata struct {
+	Target Target `protobuf:"bytes,1,opt,name=target,proto3" json:"target"`
+	// metric will be empty value if metric is requested explicitly
+	Metric string `protobuf:"bytes,2,opt,name=metric,proto3" json:"metric"`
+	Type   string `protobuf:"bytes,3,opt,name=type,proto3" json:"type"`
+	Help   string `protobuf:"bytes,4,opt,name=help,proto3" json:"help"`
+	Unit   string `protobuf:"bytes,5,opt,name=unit,proto3" json:"unit"`
+}
+
+func (m *TargetMetadata) Reset()         { *m = TargetMetadata{} }
+func (m *TargetMetadata) String() string { return proto.CompactTextString(m) }
+func (*TargetMetadata) ProtoMessage()    {}
+func (*TargetMetadata) Descriptor() ([]byte, []int) {
+	return fileDescriptor_1d9ae5661e0dc3fc, []int{6}
+}
+func (m *TargetMetadata) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *TargetMetadata) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_TargetMetadata.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *TargetMetadata) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_TargetMetadata.Merge(m, src)
+}
+func (m *TargetMetadata) XXX_Size() int {
+	return m.Size()
+}
+func (m *TargetMetadata) XXX_DiscardUnknown() {
+	xxx_messageInfo_TargetMetadata.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_TargetMetadata proto.InternalMessageInfo
+
+type TargetMetadataRequest struct {
+	// A metric name to retrieve metadata for. All metric metadata is retrieved if left empty.
+	Metric string `protobuf:"bytes,1,opt,name=metric,proto3" json:"metric,omitempty"`
+	// Label selectors that match targets by their label sets. All targets are selected if left empty.
+	MatchTarget string `protobuf:"bytes,2,opt,name=match_target,json=matchTarget,proto3" json:"match_target,omitempty"`
+	// Maximum number of targets to match
+	Limit                   int32                           `protobuf:"varint,3,opt,name=limit,proto3" json:"limit,omitempty"`
+	PartialResponseStrategy storepb.PartialResponseStrategy `protobuf:"varint,4,opt,name=partial_response_strategy,json=partialResponseStrategy,proto3,enum=thanos.PartialResponseStrategy" json:"partial_response_strategy,omitempty"`
+}
+
+func (m *TargetMetadataRequest) Reset()         { *m = TargetMetadataRequest{} }
+func (m *TargetMetadataRequest) String() string { return proto.CompactTextString(m) }
+func (*TargetMetadataRequest) ProtoMessage()    {}
+func (*TargetMetadataRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_1d9ae5661e0dc3fc, []int{7}
+}
+func (m *TargetMetadataRequest) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *TargetMetadataRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_TargetMetadataRequest.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *TargetMetadataRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_TargetMetadataRequest.Merge(m, src)
+}
+func (m *TargetMetadataRequest) XXX_Size() int {
+	return m.Size()
+}
+func (m *TargetMetadataRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_TargetMetadataRequest.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_TargetMetadataRequest proto.InternalMessageInfo
+
+type TargetMetadataResponse struct {
+	// Types that are valid to be assigned to Result:
+	//	*TargetMetadataResponse_Data
+	//	*TargetMetadataResponse_Warning
+	Result isTargetMetadataResponse_Result `protobuf_oneof:"result"`
+}
+
+func (m *TargetMetadataResponse) Reset()         { *m = TargetMetadataResponse{} }
+func (m *TargetMetadataResponse) String() string { return proto.CompactTextString(m) }
+func (*TargetMetadataResponse) ProtoMessage()    {}
+func (*TargetMetadataResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptor_1d9ae5661e0dc3fc, []int{8}
+}
+func (m *TargetMetadataResponse) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *TargetMetadataResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_TargetMetadataResponse.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *TargetMetadataResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_TargetMetadataResponse.Merge(m, src)
+}
+func (m *TargetMetadataResponse) XXX_Size() int {
+	return m.Size()
+}
+func (m *TargetMetadataResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_TargetMetadataResponse.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_TargetMetadataResponse proto.InternalMessageInfo
+
+type isTargetMetadataResponse_Result interface {
+	isTargetMetadataResponse_Result()
+	MarshalTo([]byte) (int, error)
+	Size() int
+}
+
+type TargetMetadataResponse_Data struct {
+	Data *TargetMetadata `protobuf:"bytes,1,opt,name=data,proto3,oneof" json:"data,omitempty"`
+}
+type TargetMetadataResponse_Warning struct {
+	Warning string `protobuf:"bytes,2,opt,name=warning,proto3,oneof" json:"warning,omitempty"`
+}
+
+func (*TargetMetadataResponse_Data) isTargetMetadataResponse_Result()    {}
+func (*TargetMetadataResponse_Warning) isTargetMetadataResponse_Result() {}
+
+func (m *TargetMetadataResponse) GetResult() isTargetMetadataResponse_Result {
+	if m != nil {
+		return m.Result
+	}
+	return nil
+}
+
+func (m *TargetMetadataResponse) GetData() *TargetMetadata {
+	if x, ok := m.GetResult().(*TargetMetadataResponse_Data); ok {
+		return x.Data
+	}
+	return nil
+}
+
+func (m *TargetMetadataResponse) GetWarning() string {
+	if x, ok := m.GetResult().(*TargetMetadataResponse_Warning); ok {
+		return x.Warning
+	}
+	return ""
+}
+
+// XXX_OneofWrappers is for the internal use of the proto package.
+func (*TargetMetadataResponse) XXX_OneofWrappers() []interface{} {
+	return []interface{}{
+		(*TargetMetadataResponse_Data)(nil),
+		(*TargetMetadataResponse_Warning)(nil),
+	}
+}
+
 func init() {
 	proto.RegisterType((*MetricMetadataRequest)(nil), "thanos.MetricMetadataRequest")
 	proto.RegisterType((*MetricMetadataResponse)(nil), "thanos.MetricMetadataResponse")
@@ -273,42 +481,56 @@ func init() {
 	proto.RegisterMapType((map[string]MetricMetadataEntry)(nil), "thanos.MetricMetadata.MetadataEntry")
 	proto.RegisterType((*MetricMetadataEntry)(nil), "thanos.MetricMetadataEntry")
 	proto.RegisterType((*Meta)(nil), "thanos.Meta")
+	proto.RegisterType((*Target)(nil), "thanos.Target")
+	proto.RegisterType((*TargetMetadata)(nil), "thanos.TargetMetadata")
+	proto.RegisterType((*TargetMetadataRequest)(nil), "thanos.TargetMetadataRequest")
+	proto.RegisterType((*TargetMetadataResponse)(nil), "thanos.TargetMetadataResponse")
 }
 
 func init() { proto.RegisterFile("metadata/metadatapb/rpc.proto", fileDescriptor_1d9ae5661e0dc3fc) }
 
 var fileDescriptor_1d9ae5661e0dc3fc = []byte{
-	// 465 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x74, 0x53, 0xcd, 0x6e, 0x13, 0x31,
-	0x10, 0x5e, 0xe7, 0x8f, 0x74, 0x02, 0x15, 0x32, 0x25, 0xa4, 0x0b, 0xdd, 0x44, 0x2b, 0x0e, 0x7b,
-	0xca, 0xc2, 0xc2, 0x01, 0x71, 0x41, 0x8a, 0x04, 0xea, 0xa5, 0x12, 0x98, 0x0b, 0x02, 0xa1, 0xe2,
-	0x14, 0x2b, 0x5d, 0xb1, 0xd9, 0x35, 0xf6, 0x04, 0x94, 0xb7, 0xe0, 0x19, 0x78, 0x04, 0x9e, 0x22,
-	0xc7, 0x1e, 0x39, 0x55, 0x90, 0xdc, 0x78, 0x0a, 0x64, 0x7b, 0xb7, 0x34, 0xb0, 0x5c, 0x46, 0x33,
-	0xf3, 0x7d, 0x9e, 0xf9, 0x3c, 0x1e, 0xc3, 0xc1, 0x5c, 0x20, 0x7f, 0xcf, 0x91, 0xc7, 0x95, 0x23,
-	0xa7, 0xb1, 0x92, 0x27, 0x63, 0xa9, 0x0a, 0x2c, 0x68, 0x07, 0x4f, 0x79, 0x5e, 0x68, 0x7f, 0x5f,
-	0x63, 0xa1, 0x44, 0x6c, 0xad, 0x9c, 0xc6, 0xb8, 0x94, 0x42, 0x3b, 0x8a, 0xbf, 0x37, 0x2b, 0x66,
-	0x85, 0x75, 0x63, 0xe3, 0xb9, 0x6c, 0xf8, 0x95, 0xc0, 0xcd, 0x23, 0x81, 0x2a, 0x3d, 0x39, 0x2a,
-	0xeb, 0x32, 0xf1, 0x71, 0x21, 0x34, 0xd2, 0x3e, 0x74, 0xe6, 0x16, 0x18, 0x90, 0x11, 0x89, 0x76,
-	0x58, 0x19, 0xd1, 0x3d, 0x68, 0x67, 0xe9, 0x3c, 0xc5, 0x41, 0x63, 0x44, 0xa2, 0x36, 0x73, 0x01,
-	0x7d, 0x03, 0xfb, 0x92, 0x2b, 0x4c, 0x79, 0x76, 0xac, 0x84, 0x96, 0x45, 0xae, 0xc5, 0xb1, 0x46,
-	0xc5, 0x51, 0xcc, 0x96, 0x83, 0xe6, 0x88, 0x44, 0xbb, 0xc9, 0x70, 0xec, 0x44, 0x8e, 0x9f, 0x3b,
-	0x22, 0x2b, 0x79, 0x2f, 0x4b, 0x1a, 0xbb, 0x25, 0xeb, 0x81, 0x10, 0xa1, 0xff, 0xb7, 0x46, 0xc7,
-	0xa0, 0x0f, 0xa1, 0x5b, 0xcd, 0xc3, 0xca, 0xec, 0x25, 0xfd, 0xaa, 0xcb, 0xf6, 0x89, 0x43, 0x8f,
-	0x5d, 0x30, 0xa9, 0x0f, 0x57, 0x3e, 0x73, 0x95, 0xa7, 0xf9, 0xcc, 0x5e, 0x62, 0xe7, 0xd0, 0x63,
-	0x55, 0x62, 0xd2, 0x85, 0x8e, 0x12, 0x7a, 0x91, 0x61, 0xf8, 0x8d, 0xc0, 0xee, 0x76, 0x11, 0xfa,
-	0x6c, 0xab, 0x5d, 0x33, 0xea, 0x25, 0x77, 0xeb, 0xdb, 0x8d, 0x2b, 0xe7, 0x69, 0x8e, 0x6a, 0x39,
-	0x69, 0xad, 0xce, 0x87, 0x97, 0x04, 0xf8, 0xaf, 0xe0, 0xda, 0x16, 0x81, 0x5e, 0x87, 0xe6, 0x07,
-	0xb1, 0x2c, 0x27, 0x6d, 0x5c, 0x7a, 0x1f, 0xda, 0x9f, 0x78, 0xb6, 0x10, 0x56, 0x61, 0x2f, 0xb9,
-	0x5d, 0xdf, 0xc7, 0x9e, 0x66, 0x8e, 0xf9, 0xb8, 0xf1, 0x88, 0x84, 0x4f, 0xe0, 0x46, 0x0d, 0x83,
-	0x46, 0xd0, 0x36, 0xcd, 0xf5, 0xa0, 0x61, 0x55, 0x5f, 0xbd, 0x54, 0x8d, 0x97, 0xea, 0x1c, 0x21,
-	0x7c, 0x07, 0x2d, 0x93, 0xa4, 0x77, 0xa0, 0x65, 0xb6, 0xc7, 0x49, 0x9a, 0x74, 0x7f, 0x9d, 0x0f,
-	0x6d, 0xcc, 0xac, 0x35, 0xe8, 0xa9, 0xc8, 0xa4, 0x1b, 0x9f, 0x43, 0x4d, 0xcc, 0xac, 0x35, 0xe8,
-	0x22, 0x4f, 0xd1, 0xbe, 0x7b, 0x89, 0x9a, 0x98, 0x59, 0x9b, 0xbc, 0x85, 0xee, 0xc5, 0x40, 0x5f,
-	0xfc, 0x33, 0xe2, 0x83, 0xfa, 0x8b, 0x96, 0x5b, 0xe9, 0x07, 0xff, 0x83, 0xdd, 0x42, 0xdc, 0x23,
-	0x93, 0x68, 0xf5, 0x33, 0xf0, 0x56, 0xeb, 0x80, 0x9c, 0xad, 0x03, 0xf2, 0x63, 0x1d, 0x90, 0x2f,
-	0x9b, 0xc0, 0x3b, 0xdb, 0x04, 0xde, 0xf7, 0x4d, 0xe0, 0xbd, 0x86, 0x3f, 0xdf, 0x67, 0xda, 0xb1,
-	0x5f, 0xe0, 0xc1, 0xef, 0x00, 0x00, 0x00, 0xff, 0xff, 0xfa, 0x76, 0xe8, 0xa7, 0x5c, 0x03, 0x00,
-	0x00,
+	// 633 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xa4, 0x54, 0xcd, 0x6e, 0xd3, 0x40,
+	0x10, 0xf6, 0xd6, 0x8e, 0x9b, 0x4e, 0x4a, 0x84, 0x96, 0x36, 0xa4, 0x81, 0xda, 0xc5, 0xe2, 0xe0,
+	0x03, 0x4a, 0x4a, 0x40, 0x08, 0x71, 0x41, 0x8a, 0x04, 0xea, 0xa5, 0x12, 0x2c, 0x1c, 0x10, 0x1c,
+	0xca, 0x26, 0xac, 0x52, 0x83, 0x63, 0x1b, 0x7b, 0x03, 0xca, 0x5b, 0xf0, 0x0c, 0x3c, 0x01, 0xe2,
+	0x1d, 0x40, 0x3d, 0xf6, 0xc8, 0x29, 0x82, 0xf6, 0x96, 0xa7, 0x40, 0xfb, 0x63, 0x53, 0xb7, 0xa6,
+	0x54, 0xe2, 0xb2, 0x99, 0x9f, 0x2f, 0x33, 0xdf, 0x7c, 0xbb, 0x63, 0xd8, 0x9c, 0x30, 0x4e, 0xdf,
+	0x50, 0x4e, 0x7b, 0xb9, 0x91, 0x0c, 0x7b, 0x69, 0x32, 0xea, 0x26, 0x69, 0xcc, 0x63, 0x6c, 0xf3,
+	0x7d, 0x1a, 0xc5, 0x59, 0x67, 0x23, 0xe3, 0x71, 0xca, 0x7a, 0xf2, 0x4c, 0x86, 0x3d, 0x3e, 0x4b,
+	0x58, 0xa6, 0x20, 0x9d, 0xb5, 0x71, 0x3c, 0x8e, 0xa5, 0xd9, 0x13, 0x96, 0x8a, 0x7a, 0x9f, 0x11,
+	0xac, 0xef, 0x32, 0x9e, 0x06, 0xa3, 0x5d, 0x5d, 0x97, 0xb0, 0xf7, 0x53, 0x96, 0x71, 0xdc, 0x02,
+	0x7b, 0x22, 0x13, 0x6d, 0xb4, 0x85, 0xfc, 0x15, 0xa2, 0x3d, 0xbc, 0x06, 0xb5, 0x30, 0x98, 0x04,
+	0xbc, 0xbd, 0xb4, 0x85, 0xfc, 0x1a, 0x51, 0x0e, 0x7e, 0x05, 0x1b, 0x09, 0x4d, 0x79, 0x40, 0xc3,
+	0xbd, 0x94, 0x65, 0x49, 0x1c, 0x65, 0x6c, 0x2f, 0xe3, 0x29, 0xe5, 0x6c, 0x3c, 0x6b, 0x9b, 0x5b,
+	0xc8, 0x6f, 0xf6, 0xdd, 0xae, 0x22, 0xd9, 0x7d, 0xa2, 0x80, 0x44, 0xe3, 0x9e, 0x69, 0x18, 0xb9,
+	0x9a, 0x54, 0x27, 0x3c, 0x0e, 0xad, 0xd3, 0x1c, 0x15, 0x02, 0xdf, 0x85, 0x7a, 0xae, 0x87, 0xa4,
+	0xd9, 0xe8, 0xb7, 0xf2, 0x2e, 0xe5, 0x7f, 0xec, 0x18, 0xa4, 0x40, 0xe2, 0x0e, 0x2c, 0x7f, 0xa4,
+	0x69, 0x14, 0x44, 0x63, 0x39, 0xc4, 0xca, 0x8e, 0x41, 0xf2, 0xc0, 0xa0, 0x0e, 0x76, 0xca, 0xb2,
+	0x69, 0xc8, 0xbd, 0xaf, 0x08, 0x9a, 0xe5, 0x22, 0xf8, 0x71, 0xa9, 0x9d, 0xe9, 0x37, 0xfa, 0x37,
+	0xab, 0xdb, 0x75, 0x73, 0xe3, 0x51, 0xc4, 0xd3, 0xd9, 0xc0, 0x3a, 0x98, 0xbb, 0x27, 0x08, 0x74,
+	0x5e, 0xc0, 0xa5, 0x12, 0x00, 0x5f, 0x06, 0xf3, 0x1d, 0x9b, 0x69, 0xa5, 0x85, 0x89, 0x6f, 0x43,
+	0xed, 0x03, 0x0d, 0xa7, 0x4c, 0x32, 0x6c, 0xf4, 0xaf, 0x55, 0xf7, 0x91, 0xff, 0x26, 0x0a, 0xf9,
+	0x60, 0xe9, 0x3e, 0xf2, 0x1e, 0xc2, 0x95, 0x0a, 0x04, 0xf6, 0xa1, 0x26, 0x9a, 0x67, 0xed, 0x25,
+	0xc9, 0x7a, 0xf5, 0x44, 0x35, 0xaa, 0xd9, 0x29, 0x80, 0xf7, 0x1a, 0x2c, 0x11, 0xc4, 0xd7, 0xc1,
+	0x12, 0xaf, 0x47, 0x51, 0x1a, 0xd4, 0x17, 0x73, 0x57, 0xfa, 0x44, 0x9e, 0x22, 0xbb, 0xcf, 0xc2,
+	0x44, 0xc9, 0xa7, 0xb2, 0xc2, 0x27, 0xf2, 0x14, 0xd9, 0x69, 0x14, 0x70, 0x79, 0xef, 0x3a, 0x2b,
+	0x7c, 0x22, 0x4f, 0x6f, 0x17, 0xec, 0xe7, 0x34, 0x1d, 0x33, 0x8e, 0x7d, 0xa8, 0x07, 0x51, 0xc6,
+	0x69, 0x34, 0xca, 0xfb, 0xac, 0x2e, 0xe6, 0x6e, 0x11, 0x23, 0x85, 0x85, 0x37, 0xc0, 0x7c, 0x1b,
+	0x0f, 0x75, 0xbb, 0xe5, 0xc5, 0xdc, 0x15, 0x2e, 0x11, 0x87, 0xf7, 0x1d, 0x41, 0x53, 0xd5, 0x2b,
+	0xae, 0xe9, 0x1e, 0xd8, 0x5c, 0x46, 0xf4, 0x9b, 0x68, 0xe6, 0xe3, 0x2a, 0xdc, 0xa0, 0x29, 0x06,
+	0x5e, 0xcc, 0x5d, 0x8d, 0x22, 0xfa, 0x17, 0x7b, 0xc5, 0x93, 0x57, 0x8d, 0x40, 0x60, 0x54, 0xa4,
+	0x78, 0xfe, 0xb9, 0x2e, 0xe6, 0xb9, 0xba, 0x58, 0xe7, 0xea, 0x52, 0xab, 0xd4, 0xe5, 0x1b, 0x82,
+	0xf5, 0xf2, 0x20, 0xff, 0x5a, 0xc5, 0x1b, 0xb0, 0x3a, 0xa1, 0x7c, 0xb4, 0xbf, 0xa7, 0xa7, 0x95,
+	0xac, 0x49, 0x43, 0xc6, 0xb4, 0xc4, 0xc5, 0xb6, 0x9a, 0x17, 0xde, 0x56, 0xeb, 0x3f, 0xb7, 0x35,
+	0x84, 0xd6, 0xe9, 0x31, 0xf4, 0xb6, 0xde, 0x02, 0xab, 0x6a, 0x53, 0xcb, 0xe8, 0x1d, 0x83, 0x58,
+	0x17, 0xdf, 0xd2, 0xfe, 0x17, 0x04, 0xf5, 0xe2, 0xe2, 0x9f, 0x9e, 0xd9, 0xd8, 0xcd, 0xea, 0xbd,
+	0xd1, 0xca, 0x76, 0x9c, 0xbf, 0xa5, 0x15, 0xe3, 0x6d, 0x24, 0x4a, 0x9e, 0x7a, 0x5d, 0x9b, 0xd5,
+	0xbc, 0xcf, 0x94, 0xac, 0x16, 0x61, 0x1b, 0x0d, 0xfc, 0x83, 0x5f, 0x8e, 0x71, 0x70, 0xe4, 0xa0,
+	0xc3, 0x23, 0x07, 0xfd, 0x3c, 0x72, 0xd0, 0xa7, 0x63, 0xc7, 0x38, 0x3c, 0x76, 0x8c, 0x1f, 0xc7,
+	0x8e, 0xf1, 0x12, 0xfe, 0x7c, 0xe0, 0x87, 0xb6, 0xfc, 0x48, 0xdf, 0xf9, 0x1d, 0x00, 0x00, 0xff,
+	0xff, 0xfc, 0x64, 0x6b, 0xbe, 0xfe, 0x05, 0x00, 0x00,
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -324,6 +546,7 @@ const _ = grpc.SupportPackageIsVersion4
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://godoc.org/google.golang.org/grpc#ClientConn.NewStream.
 type MetadataClient interface {
 	MetricMetadata(ctx context.Context, in *MetricMetadataRequest, opts ...grpc.CallOption) (Metadata_MetricMetadataClient, error)
+	TargetMetadata(ctx context.Context, in *TargetMetadataRequest, opts ...grpc.CallOption) (Metadata_TargetMetadataClient, error)
 }
 
 type metadataClient struct {
@@ -366,9 +589,42 @@ func (x *metadataMetricMetadataClient) Recv() (*MetricMetadataResponse, error) {
 	return m, nil
 }
 
+func (c *metadataClient) TargetMetadata(ctx context.Context, in *TargetMetadataRequest, opts ...grpc.CallOption) (Metadata_TargetMetadataClient, error) {
+	stream, err := c.cc.NewStream(ctx, &_Metadata_serviceDesc.Streams[1], "/thanos.Metadata/TargetMetadata", opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &metadataTargetMetadataClient{stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+type Metadata_TargetMetadataClient interface {
+	Recv() (*TargetMetadataResponse, error)
+	grpc.ClientStream
+}
+
+type metadataTargetMetadataClient struct {
+	grpc.ClientStream
+}
+
+func (x *metadataTargetMetadataClient) Recv() (*TargetMetadataResponse, error) {
+	m := new(TargetMetadataResponse)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 // MetadataServer is the server API for Metadata service.
 type MetadataServer interface {
 	MetricMetadata(*MetricMetadataRequest, Metadata_MetricMetadataServer) error
+	TargetMetadata(*TargetMetadataRequest, Metadata_TargetMetadataServer) error
 }
 
 // UnimplementedMetadataServer can be embedded to have forward compatible implementations.
@@ -377,6 +633,9 @@ type UnimplementedMetadataServer struct {
 
 func (*UnimplementedMetadataServer) MetricMetadata(req *MetricMetadataRequest, srv Metadata_MetricMetadataServer) error {
 	return status.Errorf(codes.Unimplemented, "method MetricMetadata not implemented")
+}
+func (*UnimplementedMetadataServer) TargetMetadata(req *TargetMetadataRequest, srv Metadata_TargetMetadataServer) error {
+	return status.Errorf(codes.Unimplemented, "method TargetMetadata not implemented")
 }
 
 func RegisterMetadataServer(s *grpc.Server, srv MetadataServer) {
@@ -404,6 +663,27 @@ func (x *metadataMetricMetadataServer) Send(m *MetricMetadataResponse) error {
 	return x.ServerStream.SendMsg(m)
 }
 
+func _Metadata_TargetMetadata_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(TargetMetadataRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(MetadataServer).TargetMetadata(m, &metadataTargetMetadataServer{stream})
+}
+
+type Metadata_TargetMetadataServer interface {
+	Send(*TargetMetadataResponse) error
+	grpc.ServerStream
+}
+
+type metadataTargetMetadataServer struct {
+	grpc.ServerStream
+}
+
+func (x *metadataTargetMetadataServer) Send(m *TargetMetadataResponse) error {
+	return x.ServerStream.SendMsg(m)
+}
+
 var _Metadata_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "thanos.Metadata",
 	HandlerType: (*MetadataServer)(nil),
@@ -412,6 +692,11 @@ var _Metadata_serviceDesc = grpc.ServiceDesc{
 		{
 			StreamName:    "MetricMetadata",
 			Handler:       _Metadata_MetricMetadata_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "TargetMetadata",
+			Handler:       _Metadata_TargetMetadata_Handler,
 			ServerStreams: true,
 		},
 	},
@@ -653,6 +938,218 @@ func (m *Meta) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 
+func (m *Target) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *Target) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *Target) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.Job) > 0 {
+		i -= len(m.Job)
+		copy(dAtA[i:], m.Job)
+		i = encodeVarintRpc(dAtA, i, uint64(len(m.Job)))
+		i--
+		dAtA[i] = 0x12
+	}
+	if len(m.Instance) > 0 {
+		i -= len(m.Instance)
+		copy(dAtA[i:], m.Instance)
+		i = encodeVarintRpc(dAtA, i, uint64(len(m.Instance)))
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *TargetMetadata) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *TargetMetadata) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *TargetMetadata) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.Unit) > 0 {
+		i -= len(m.Unit)
+		copy(dAtA[i:], m.Unit)
+		i = encodeVarintRpc(dAtA, i, uint64(len(m.Unit)))
+		i--
+		dAtA[i] = 0x2a
+	}
+	if len(m.Help) > 0 {
+		i -= len(m.Help)
+		copy(dAtA[i:], m.Help)
+		i = encodeVarintRpc(dAtA, i, uint64(len(m.Help)))
+		i--
+		dAtA[i] = 0x22
+	}
+	if len(m.Type) > 0 {
+		i -= len(m.Type)
+		copy(dAtA[i:], m.Type)
+		i = encodeVarintRpc(dAtA, i, uint64(len(m.Type)))
+		i--
+		dAtA[i] = 0x1a
+	}
+	if len(m.Metric) > 0 {
+		i -= len(m.Metric)
+		copy(dAtA[i:], m.Metric)
+		i = encodeVarintRpc(dAtA, i, uint64(len(m.Metric)))
+		i--
+		dAtA[i] = 0x12
+	}
+	{
+		size, err := m.Target.MarshalToSizedBuffer(dAtA[:i])
+		if err != nil {
+			return 0, err
+		}
+		i -= size
+		i = encodeVarintRpc(dAtA, i, uint64(size))
+	}
+	i--
+	dAtA[i] = 0xa
+	return len(dAtA) - i, nil
+}
+
+func (m *TargetMetadataRequest) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *TargetMetadataRequest) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *TargetMetadataRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.PartialResponseStrategy != 0 {
+		i = encodeVarintRpc(dAtA, i, uint64(m.PartialResponseStrategy))
+		i--
+		dAtA[i] = 0x20
+	}
+	if m.Limit != 0 {
+		i = encodeVarintRpc(dAtA, i, uint64(m.Limit))
+		i--
+		dAtA[i] = 0x18
+	}
+	if len(m.MatchTarget) > 0 {
+		i -= len(m.MatchTarget)
+		copy(dAtA[i:], m.MatchTarget)
+		i = encodeVarintRpc(dAtA, i, uint64(len(m.MatchTarget)))
+		i--
+		dAtA[i] = 0x12
+	}
+	if len(m.Metric) > 0 {
+		i -= len(m.Metric)
+		copy(dAtA[i:], m.Metric)
+		i = encodeVarintRpc(dAtA, i, uint64(len(m.Metric)))
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *TargetMetadataResponse) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *TargetMetadataResponse) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *TargetMetadataResponse) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.Result != nil {
+		{
+			size := m.Result.Size()
+			i -= size
+			if _, err := m.Result.MarshalTo(dAtA[i:]); err != nil {
+				return 0, err
+			}
+		}
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *TargetMetadataResponse_Data) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *TargetMetadataResponse_Data) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	if m.Data != nil {
+		{
+			size, err := m.Data.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintRpc(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+func (m *TargetMetadataResponse_Warning) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *TargetMetadataResponse_Warning) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	i -= len(m.Warning)
+	copy(dAtA[i:], m.Warning)
+	i = encodeVarintRpc(dAtA, i, uint64(len(m.Warning)))
+	i--
+	dAtA[i] = 0x12
+	return len(dAtA) - i, nil
+}
 func encodeVarintRpc(dAtA []byte, offset int, v uint64) int {
 	offset -= sovRpc(v)
 	base := offset
@@ -768,6 +1265,108 @@ func (m *Meta) Size() (n int) {
 	if l > 0 {
 		n += 1 + l + sovRpc(uint64(l))
 	}
+	return n
+}
+
+func (m *Target) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.Instance)
+	if l > 0 {
+		n += 1 + l + sovRpc(uint64(l))
+	}
+	l = len(m.Job)
+	if l > 0 {
+		n += 1 + l + sovRpc(uint64(l))
+	}
+	return n
+}
+
+func (m *TargetMetadata) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = m.Target.Size()
+	n += 1 + l + sovRpc(uint64(l))
+	l = len(m.Metric)
+	if l > 0 {
+		n += 1 + l + sovRpc(uint64(l))
+	}
+	l = len(m.Type)
+	if l > 0 {
+		n += 1 + l + sovRpc(uint64(l))
+	}
+	l = len(m.Help)
+	if l > 0 {
+		n += 1 + l + sovRpc(uint64(l))
+	}
+	l = len(m.Unit)
+	if l > 0 {
+		n += 1 + l + sovRpc(uint64(l))
+	}
+	return n
+}
+
+func (m *TargetMetadataRequest) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.Metric)
+	if l > 0 {
+		n += 1 + l + sovRpc(uint64(l))
+	}
+	l = len(m.MatchTarget)
+	if l > 0 {
+		n += 1 + l + sovRpc(uint64(l))
+	}
+	if m.Limit != 0 {
+		n += 1 + sovRpc(uint64(m.Limit))
+	}
+	if m.PartialResponseStrategy != 0 {
+		n += 1 + sovRpc(uint64(m.PartialResponseStrategy))
+	}
+	return n
+}
+
+func (m *TargetMetadataResponse) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.Result != nil {
+		n += m.Result.Size()
+	}
+	return n
+}
+
+func (m *TargetMetadataResponse_Data) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.Data != nil {
+		l = m.Data.Size()
+		n += 1 + l + sovRpc(uint64(l))
+	}
+	return n
+}
+func (m *TargetMetadataResponse_Warning) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.Warning)
+	n += 1 + l + sovRpc(uint64(l))
 	return n
 }
 
@@ -1401,6 +2000,600 @@ func (m *Meta) Unmarshal(dAtA []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			m.Unit = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipRpc(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthRpc
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *Target) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowRpc
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: Target: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: Target: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Instance", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRpc
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthRpc
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthRpc
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Instance = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Job", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRpc
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthRpc
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthRpc
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Job = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipRpc(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthRpc
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *TargetMetadata) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowRpc
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: TargetMetadata: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: TargetMetadata: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Target", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRpc
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthRpc
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthRpc
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.Target.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Metric", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRpc
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthRpc
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthRpc
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Metric = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Type", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRpc
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthRpc
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthRpc
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Type = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Help", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRpc
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthRpc
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthRpc
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Help = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 5:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Unit", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRpc
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthRpc
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthRpc
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Unit = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipRpc(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthRpc
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *TargetMetadataRequest) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowRpc
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: TargetMetadataRequest: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: TargetMetadataRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Metric", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRpc
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthRpc
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthRpc
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Metric = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field MatchTarget", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRpc
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthRpc
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthRpc
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.MatchTarget = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 3:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Limit", wireType)
+			}
+			m.Limit = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRpc
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.Limit |= int32(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 4:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field PartialResponseStrategy", wireType)
+			}
+			m.PartialResponseStrategy = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRpc
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.PartialResponseStrategy |= storepb.PartialResponseStrategy(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		default:
+			iNdEx = preIndex
+			skippy, err := skipRpc(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthRpc
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *TargetMetadataResponse) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowRpc
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: TargetMetadataResponse: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: TargetMetadataResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Data", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRpc
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthRpc
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthRpc
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			v := &TargetMetadata{}
+			if err := v.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			m.Result = &TargetMetadataResponse_Data{v}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Warning", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRpc
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthRpc
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthRpc
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Result = &TargetMetadataResponse_Warning{string(dAtA[iNdEx:postIndex])}
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
