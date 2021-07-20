@@ -60,9 +60,21 @@ func DefaultImage() string {
 	return "thanos"
 }
 
+func PrometheusRelLocalDir(name string) string {
+	return filepath.Join("data", "prometheus", name)
+}
+
+func QuerierRelLocalDir(name string) string {
+	return filepath.Join("data", "querier", name)
+}
+
+func ReceiveRelLocalDir(name string) string {
+	return filepath.Join("data", "receive", name)
+}
+
 func NewPrometheus(sharedDir, name, config, promImage string, enableFeatures ...string) (*e2e.HTTPService, string, error) {
-	dir := filepath.Join(sharedDir, "data", "prometheus", name)
-	container := filepath.Join(e2e.ContainerSharedDir, "data", "prometheus", name)
+	dir := filepath.Join(sharedDir, PrometheusRelLocalDir(name))
+	container := filepath.Join(e2e.ContainerSharedDir, PrometheusRelLocalDir(name))
 	if err := os.MkdirAll(dir, 0750); err != nil {
 		return nil, "", errors.Wrap(err, "create prometheus dir")
 	}
@@ -223,8 +235,8 @@ func (q *QuerierBuilder) Build() (*Service, error) {
 	}
 
 	if len(q.fileSDStoreAddresses) > 0 {
-		queryFileSDDir := filepath.Join(q.sharedDir, "data", "querier", q.name)
-		container := filepath.Join(e2e.ContainerSharedDir, "data", "querier", q.name)
+		queryFileSDDir := filepath.Join(q.sharedDir, QuerierRelLocalDir(q.name))
+		container := filepath.Join(e2e.ContainerSharedDir, QuerierRelLocalDir(q.name))
 		if err := os.MkdirAll(queryFileSDDir, 0750); err != nil {
 			return nil, errors.Wrap(err, "create query dir failed")
 		}
@@ -273,19 +285,18 @@ func (q *QuerierBuilder) Build() (*Service, error) {
 }
 
 func RemoteWriteEndpoint(addr string) string { return fmt.Sprintf("http://%s/api/v1/receive", addr) }
+func RemoteWriteEndpointHTTPS(addr string) string {
+	return fmt.Sprintf("https://%s/api/v1/receive", addr)
+}
 
 // NewRoutingAndIngestingReceiver creates a Thanos Receive instances that is configured both for ingesting samples and routing samples to other receivers.
 func NewRoutingAndIngestingReceiver(sharedDir, networkName, name string, replicationFactor int, hashring ...receive.HashringConfig) (*Service, error) {
-
 	localEndpoint := NewService(fmt.Sprintf("receive-%v", name), "", e2e.NewCommand("", ""), nil, 8080, 9091, 8081).GRPCNetworkEndpointFor(networkName)
 	if len(hashring) == 0 {
 		hashring = []receive.HashringConfig{{Endpoints: []string{localEndpoint}}}
 	}
 
-	dir := filepath.Join(sharedDir, "data", "receive", name)
-	dataDir := filepath.Join(dir, "data")
-	container := filepath.Join(e2e.ContainerSharedDir, "data", "receive", name)
-	if err := os.MkdirAll(dataDir, 0750); err != nil {
+	if err := os.MkdirAll(filepath.Join(sharedDir, ReceiveRelLocalDir(name), "data"), 0750); err != nil {
 		return nil, errors.Wrap(err, "create receive dir")
 	}
 	b, err := json.Marshal(hashring)
@@ -304,7 +315,7 @@ func NewRoutingAndIngestingReceiver(sharedDir, networkName, name string, replica
 			"--http-address":               ":8080",
 			"--remote-write.address":       ":8081",
 			"--label":                      fmt.Sprintf(`receive="%s"`, name),
-			"--tsdb.path":                  filepath.Join(container, "data"),
+			"--tsdb.path":                  filepath.Join(e2e.ContainerSharedDir, ReceiveRelLocalDir(name), "data"),
 			"--log.level":                  infoLogLevel,
 			"--receive.replication-factor": strconv.Itoa(replicationFactor),
 			"--receive.local-endpoint":     localEndpoint,
@@ -323,15 +334,11 @@ func NewRoutingAndIngestingReceiver(sharedDir, networkName, name string, replica
 
 // NewRoutingReceiver creates a Thanos Receive instance that is only configured to route to other receive instances. It has no local storage.
 func NewRoutingReceiver(sharedDir, name string, replicationFactor int, hashring ...receive.HashringConfig) (*Service, error) {
-
 	if len(hashring) == 0 {
 		return nil, errors.New("hashring should not be empty for receive-distributor mode")
 	}
 
-	dir := filepath.Join(sharedDir, "data", "receive", name)
-	dataDir := filepath.Join(dir, "data")
-	container := filepath.Join(e2e.ContainerSharedDir, "data", "receive", name)
-	if err := os.MkdirAll(dataDir, 0750); err != nil {
+	if err := os.MkdirAll(filepath.Join(sharedDir, ReceiveRelLocalDir(name), "data"), 0750); err != nil {
 		return nil, errors.Wrap(err, "create receive dir")
 	}
 	b, err := json.Marshal(hashring)
@@ -350,7 +357,7 @@ func NewRoutingReceiver(sharedDir, name string, replicationFactor int, hashring 
 			"--http-address":               ":8080",
 			"--remote-write.address":       ":8081",
 			"--label":                      fmt.Sprintf(`receive="%s"`, name),
-			"--tsdb.path":                  filepath.Join(container, "data"),
+			"--tsdb.path":                  filepath.Join(e2e.ContainerSharedDir, ReceiveRelLocalDir(name), "data"),
 			"--log.level":                  infoLogLevel,
 			"--receive.replication-factor": strconv.Itoa(replicationFactor),
 			"--receive.hashrings":          string(b),
@@ -367,27 +374,25 @@ func NewRoutingReceiver(sharedDir, name string, replicationFactor int, hashring 
 }
 
 // NewIngestingReceiver creates a Thanos Receive instance that is only configured to ingest, not route to other receivers.
-func NewIngestingReceiver(sharedDir, name string) (*Service, error) {
-	dir := filepath.Join(sharedDir, "data", "receive", name)
-	dataDir := filepath.Join(dir, "data")
-	container := filepath.Join(e2e.ContainerSharedDir, "data", "receive", name)
-	if err := os.MkdirAll(dataDir, 0750); err != nil {
+func NewIngestingReceiver(sharedDir, name string, extraFlags ...string) (*Service, error) {
+	if err := os.MkdirAll(filepath.Join(sharedDir, ReceiveRelLocalDir(name), "data"), 0750); err != nil {
 		return nil, errors.Wrap(err, "create receive dir")
 	}
+
 	receiver := NewService(
 		fmt.Sprintf("receive-%v", name),
 		DefaultImage(),
 		// TODO(bwplotka): BuildArgs should be interface.
-		e2e.NewCommand("receive", e2e.BuildArgs(map[string]string{
+		e2e.NewCommand("receive", append(e2e.BuildArgs(map[string]string{
 			"--debug.name":           fmt.Sprintf("receive-%v", name),
 			"--grpc-address":         ":9091",
 			"--grpc-grace-period":    "0s",
 			"--http-address":         ":8080",
 			"--remote-write.address": ":8081",
 			"--label":                fmt.Sprintf(`receive="%s"`, name),
-			"--tsdb.path":            filepath.Join(container, "data"),
+			"--tsdb.path":            filepath.Join(e2e.ContainerSharedDir, ReceiveRelLocalDir(name), "data"),
 			"--log.level":            infoLogLevel,
-		})...),
+		}), extraFlags...)...),
 		e2e.NewHTTPReadinessProbe(8080, "/-/ready", 200, 200),
 		8080,
 		9091,

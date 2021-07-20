@@ -1,4 +1,5 @@
 .envrc
+*.csr
 
 /prometheus
 /thanos

@@ -5,17 +5,25 @@ package e2e_test
 
 import (
 	"context"
+	"fmt"
+	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"os"
+	"path/filepath"
+	"syscall"
 	"testing"
 	"time"
 
 	"github.com/cortexproject/cortex/integration/e2e"
+	"github.com/pkg/errors"
 	"github.com/prometheus/common/model"
 	"github.com/thanos-io/thanos/pkg/promclient"
 	"github.com/thanos-io/thanos/pkg/receive"
+	"github.com/thanos-io/thanos/pkg/runutil"
 	"github.com/thanos-io/thanos/pkg/testutil"
 	"github.com/thanos-io/thanos/test/e2e/e2ethanos"
 )
@@ -85,7 +93,11 @@ func TestReceive(t *testing.T) {
 		testutil.Ok(t, s.StartAndWaitReady(i))
 
 		// Setup Prometheus
-		prom, _, err := e2ethanos.NewPrometheus(s.SharedDir(), "1", defaultPromConfig("prom1", 0, e2ethanos.RemoteWriteEndpoint(i.NetworkEndpoint(8081)), ""), e2ethanos.DefaultPrometheusImage())
+		prom, _, err := e2ethanos.NewPrometheus(s.SharedDir(), "1", defaultPromConfig(
+			"prom1",
+			0,
+			defaultRemoteWriteEntry(e2ethanos.RemoteWriteEndpoint(i.NetworkEndpoint(8081))), "",
+		), e2ethanos.DefaultPrometheusImage())
 		testutil.Ok(t, err)
 		testutil.Ok(t, s.StartAndWaitReady(prom))
 
@@ -168,11 +180,23 @@ func TestReceive(t *testing.T) {
 		testutil.Ok(t, err)
 		testutil.Ok(t, s.StartAndWaitReady(i1, i2, i3, r1))
 
-		prom1, _, err := e2ethanos.NewPrometheus(s.SharedDir(), "1", defaultPromConfig("prom1", 0, e2ethanos.RemoteWriteEndpoint(r1.NetworkEndpoint(8081)), ""), e2ethanos.DefaultPrometheusImage())
+		prom1, _, err := e2ethanos.NewPrometheus(s.SharedDir(), "1", defaultPromConfig(
+			"prom1",
+			0,
+			defaultRemoteWriteEntry(e2ethanos.RemoteWriteEndpoint(r1.NetworkEndpoint(8081))), "",
+		), e2ethanos.DefaultPrometheusImage())
 		testutil.Ok(t, err)
-		prom2, _, err := e2ethanos.NewPrometheus(s.SharedDir(), "2", defaultPromConfig("prom2", 0, e2ethanos.RemoteWriteEndpoint(r1.NetworkEndpoint(8081)), ""), e2ethanos.DefaultPrometheusImage())
+		prom2, _, err := e2ethanos.NewPrometheus(s.SharedDir(), "2", defaultPromConfig(
+			"prom2",
+			0,
+			defaultRemoteWriteEntry(e2ethanos.RemoteWriteEndpoint(r1.NetworkEndpoint(8081))), "",
+		), e2ethanos.DefaultPrometheusImage())
 		testutil.Ok(t, err)
-		prom3, _, err := e2ethanos.NewPrometheus(s.SharedDir(), "3", defaultPromConfig("prom3", 0, e2ethanos.RemoteWriteEndpoint(r1.NetworkEndpoint(8081)), ""), e2ethanos.DefaultPrometheusImage())
+		prom3, _, err := e2ethanos.NewPrometheus(s.SharedDir(), "3", defaultPromConfig(
+			"prom3",
+			0,
+			defaultRemoteWriteEntry(e2ethanos.RemoteWriteEndpoint(r1.NetworkEndpoint(8081))), "",
+		), e2ethanos.DefaultPrometheusImage())
 		testutil.Ok(t, err)
 		testutil.Ok(t, s.StartAndWaitReady(prom1, prom2, prom3))
 
@@ -282,9 +306,17 @@ func TestReceive(t *testing.T) {
 		testutil.Ok(t, s.StartAndWaitReady(i1, i2, i3, r1, r2))
 
 		//Setup Prometheuses
-		prom1, _, err := e2ethanos.NewPrometheus(s.SharedDir(), "1", defaultPromConfig("prom1", 0, e2ethanos.RemoteWriteEndpoint(r1.NetworkEndpoint(8081)), ""), e2ethanos.DefaultPrometheusImage())
+		prom1, _, err := e2ethanos.NewPrometheus(s.SharedDir(), "1", defaultPromConfig(
+			"prom1",
+			0,
+			defaultRemoteWriteEntry(e2ethanos.RemoteWriteEndpoint(r1.NetworkEndpoint(8081))), "",
+		), e2ethanos.DefaultPrometheusImage())
 		testutil.Ok(t, err)
-		prom2, _, err := e2ethanos.NewPrometheus(s.SharedDir(), "2", defaultPromConfig("prom2", 0, e2ethanos.RemoteWriteEndpoint(r1.NetworkEndpoint(8081)), ""), e2ethanos.DefaultPrometheusImage())
+		prom2, _, err := e2ethanos.NewPrometheus(s.SharedDir(), "2", defaultPromConfig(
+			"prom2",
+			0,
+			defaultRemoteWriteEntry(e2ethanos.RemoteWriteEndpoint(r1.NetworkEndpoint(8081))), "",
+		), e2ethanos.DefaultPrometheusImage())
 		testutil.Ok(t, err)
 		testutil.Ok(t, s.StartAndWaitReady(prom1, prom2))
 
@@ -383,11 +415,23 @@ func TestReceive(t *testing.T) {
 		testutil.Ok(t, err)
 		testutil.Ok(t, s.StartAndWaitReady(r1, r2, r3))
 
-		prom1, _, err := e2ethanos.NewPrometheus(s.SharedDir(), "1", defaultPromConfig("prom1", 0, e2ethanos.RemoteWriteEndpoint(r1.NetworkEndpoint(8081)), ""), e2ethanos.DefaultPrometheusImage())
+		prom1, _, err := e2ethanos.NewPrometheus(s.SharedDir(), "1", defaultPromConfig(
+			"prom1",
+			0,
+			defaultRemoteWriteEntry(e2ethanos.RemoteWriteEndpoint(r1.NetworkEndpoint(8081))), "",
+		), e2ethanos.DefaultPrometheusImage())
 		testutil.Ok(t, err)
-		prom2, _, err := e2ethanos.NewPrometheus(s.SharedDir(), "2", defaultPromConfig("prom2", 0, e2ethanos.RemoteWriteEndpoint(r2.NetworkEndpoint(8081)), ""), e2ethanos.DefaultPrometheusImage())
+		prom2, _, err := e2ethanos.NewPrometheus(s.SharedDir(), "2", defaultPromConfig(
+			"prom2",
+			0,
+			defaultRemoteWriteEntry(e2ethanos.RemoteWriteEndpoint(r1.NetworkEndpoint(8081))), "",
+		), e2ethanos.DefaultPrometheusImage())
 		testutil.Ok(t, err)
-		prom3, _, err := e2ethanos.NewPrometheus(s.SharedDir(), "3", defaultPromConfig("prom3", 0, e2ethanos.RemoteWriteEndpoint(r3.NetworkEndpoint(8081)), ""), e2ethanos.DefaultPrometheusImage())
+		prom3, _, err := e2ethanos.NewPrometheus(s.SharedDir(), "3", defaultPromConfig(
+			"prom3",
+			0,
+			defaultRemoteWriteEntry(e2ethanos.RemoteWriteEndpoint(r1.NetworkEndpoint(8081))), "",
+		), e2ethanos.DefaultPrometheusImage())
 		testutil.Ok(t, err)
 		testutil.Ok(t, s.StartAndWaitReady(prom1, prom2, prom3))
 
@@ -459,11 +503,23 @@ func TestReceive(t *testing.T) {
 		testutil.Ok(t, err)
 		testutil.Ok(t, s.StartAndWaitReady(r1, r2, r3))
 
-		prom1, _, err := e2ethanos.NewPrometheus(s.SharedDir(), "1", defaultPromConfig("prom1", 0, e2ethanos.RemoteWriteEndpoint(r1.NetworkEndpoint(8081)), ""), e2ethanos.DefaultPrometheusImage())
+		prom1, _, err := e2ethanos.NewPrometheus(s.SharedDir(), "1", defaultPromConfig(
+			"prom1",
+			0,
+			defaultRemoteWriteEntry(e2ethanos.RemoteWriteEndpoint(r1.NetworkEndpoint(8081))), "",
+		), e2ethanos.DefaultPrometheusImage())
 		testutil.Ok(t, err)
-		prom2, _, err := e2ethanos.NewPrometheus(s.SharedDir(), "2", defaultPromConfig("prom2", 0, e2ethanos.RemoteWriteEndpoint(r2.NetworkEndpoint(8081)), ""), e2ethanos.DefaultPrometheusImage())
+		prom2, _, err := e2ethanos.NewPrometheus(s.SharedDir(), "2", defaultPromConfig(
+			"prom2",
+			0,
+			defaultRemoteWriteEntry(e2ethanos.RemoteWriteEndpoint(r1.NetworkEndpoint(8081))), "",
+		), e2ethanos.DefaultPrometheusImage())
 		testutil.Ok(t, err)
-		prom3, _, err := e2ethanos.NewPrometheus(s.SharedDir(), "3", defaultPromConfig("prom3", 0, e2ethanos.RemoteWriteEndpoint(r3.NetworkEndpoint(8081)), ""), e2ethanos.DefaultPrometheusImage())
+		prom3, _, err := e2ethanos.NewPrometheus(s.SharedDir(), "3", defaultPromConfig(
+			"prom3",
+			0,
+			defaultRemoteWriteEntry(e2ethanos.RemoteWriteEndpoint(r1.NetworkEndpoint(8081))), "",
+		), e2ethanos.DefaultPrometheusImage())
 		testutil.Ok(t, err)
 		testutil.Ok(t, s.StartAndWaitReady(prom1, prom2, prom3))
 
@@ -538,7 +594,11 @@ func TestReceive(t *testing.T) {
 		testutil.Ok(t, err)
 		testutil.Ok(t, s.StartAndWaitReady(r1, r2, r3))
 
-		prom1, _, err := e2ethanos.NewPrometheus(s.SharedDir(), "1", defaultPromConfig("prom1", 0, e2ethanos.RemoteWriteEndpoint(r1.NetworkEndpoint(8081)), ""), e2ethanos.DefaultPrometheusImage())
+		prom1, _, err := e2ethanos.NewPrometheus(s.SharedDir(), "1", defaultPromConfig(
+			"prom1",
+			0,
+			defaultRemoteWriteEntry(e2ethanos.RemoteWriteEndpoint(r1.NetworkEndpoint(8081))), "",
+		), e2ethanos.DefaultPrometheusImage())
 		testutil.Ok(t, err)
 		testutil.Ok(t, s.StartAndWaitReady(prom1))
 
@@ -610,7 +670,11 @@ func TestReceive(t *testing.T) {
 		testutil.Ok(t, err)
 		testutil.Ok(t, s.StartAndWaitReady(r1, r2))
 
-		prom1, _, err := e2ethanos.NewPrometheus(s.SharedDir(), "1", defaultPromConfig("prom1", 0, e2ethanos.RemoteWriteEndpoint(r1.NetworkEndpoint(8081)), ""), e2ethanos.DefaultPrometheusImage())
+		prom1, _, err := e2ethanos.NewPrometheus(s.SharedDir(), "1", defaultPromConfig(
+			"prom1",
+			0,
+			defaultRemoteWriteEntry(e2ethanos.RemoteWriteEndpoint(r1.NetworkEndpoint(8081))), "",
+		), e2ethanos.DefaultPrometheusImage())
 		testutil.Ok(t, err)
 		testutil.Ok(t, s.StartAndWaitReady(prom1))
 
@@ -682,9 +746,17 @@ func TestReceive(t *testing.T) {
 		go generateProxy(conf1)
 		go generateProxy(conf2)
 
-		prom1, _, err := e2ethanos.NewPrometheus(s.SharedDir(), "1", defaultPromConfig("prom1", 0, "http://172.17.0.1:9097/api/v1/receive", ""), e2ethanos.DefaultPrometheusImage())
+		prom1, _, err := e2ethanos.NewPrometheus(s.SharedDir(), "1", defaultPromConfig(
+			"prom1",
+			0,
+			defaultRemoteWriteEntry("http://172.17.0.1:9097/api/v1/receive"), "",
+		), e2ethanos.DefaultPrometheusImage())
 		testutil.Ok(t, err)
-		prom2, _, err := e2ethanos.NewPrometheus(s.SharedDir(), "2", defaultPromConfig("prom1", 0, "http://172.17.0.1:9098/api/v1/receive", ""), e2ethanos.DefaultPrometheusImage())
+		prom2, _, err := e2ethanos.NewPrometheus(s.SharedDir(), "2", defaultPromConfig(
+			"prom2",
+			0,
+			defaultRemoteWriteEntry("http://172.17.0.1:9098/api/v1/receive"), "",
+		), e2ethanos.DefaultPrometheusImage())
 		testutil.Ok(t, err)
 		testutil.Ok(t, s.StartAndWaitReady(prom1))
 		testutil.Ok(t, s.StartAndWaitReady(prom2))
@@ -715,4 +787,145 @@ func TestReceive(t *testing.T) {
 			},
 		})
 	})
+
+	// TODO(bwplotka): Add TLS options
+	t.Run("mtls_single_ingestor", func(t *testing.T) {
+		/*
+			The single_ingestor suite represents the simplest possible configuration of Thanos Receive.
+			 ┌──────────┐
+			 │  Prom    │
+			 └────┬─────┘
+			      │ mTLS
+			 ┌────▼─────┐
+			 │ Ingestor │
+			 └────┬─────┘
+			      │
+			 ┌────▼─────┐
+			 │  Query   │
+			 └──────────┘
+			NB: Made with asciiflow.com - you can copy & paste the above there to modify.
+
+			Self signed certs created using following commands: create.sh
+
+		*/
+
+		t.Parallel()
+		s, err := e2e.NewScenario("e2e_receive_mtls_single_ingestor")
+		testutil.Ok(t, err)
+		t.Cleanup(e2ethanos.CleanScenario(t, s))
+
+		receiveLocalDirSuffix := e2ethanos.ReceiveRelLocalDir("ingestor")
+		testutil.Ok(t, cpyDir("./certs", filepath.Join(s.SharedDir(), receiveLocalDirSuffix)))
+		receiveRWCertsFlags := []string{
+			"--remote-write.server-tls-cert=" + filepath.Join(e2e.ContainerSharedDir, receiveLocalDirSuffix, "e2e_receive_mtls_single_ingestor_server.crt"),
+			"--remote-write.server-tls-key=" + filepath.Join(e2e.ContainerSharedDir, receiveLocalDirSuffix, "testserver.key"),
+			"--remote-write.server-tls-client-ca=" + filepath.Join(e2e.ContainerSharedDir, receiveLocalDirSuffix, "testca.crt"),
+		}
+
+		// Setup Router Ingestor.
+		i, err := e2ethanos.NewIngestingReceiver(s.SharedDir(), "ingestor", receiveRWCertsFlags...)
+		testutil.Ok(t, err)
+		testutil.Ok(t, s.StartAndWaitReady(i))
+
+		promLocalDirSuffix := e2ethanos.PrometheusRelLocalDir("1")
+		testutil.Ok(t, cpyDir("./certs", filepath.Join(s.SharedDir(), promLocalDirSuffix)))
+
+		// Setup Prometheus
+		prom, _, err := e2ethanos.NewPrometheus(s.SharedDir(), "1", defaultPromConfig(
+			"prom1",
+			0,
+			tlsRemoteWriteEntry(
+				e2ethanos.RemoteWriteEndpointHTTPS(i.NetworkEndpoint(8081)),
+				filepath.Join(e2e.ContainerSharedDir, promLocalDirSuffix, "testca.crt"),
+				filepath.Join(e2e.ContainerSharedDir, promLocalDirSuffix, "testclient.key"),
+				filepath.Join(e2e.ContainerSharedDir, promLocalDirSuffix, "e2e_receive_mtls_single_ingestor_client.crt"),
+			), "",
+		), e2ethanos.DefaultPrometheusImage())
+		testutil.Ok(t, err)
+		testutil.Ok(t, s.StartAndWaitReady(prom))
+
+		q, err := e2ethanos.NewQuerierBuilder(s.SharedDir(), "1", []string{i.GRPCNetworkEndpoint()}).Build()
+		testutil.Ok(t, err)
+		testutil.Ok(t, s.StartAndWaitReady(q))
+
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+		t.Cleanup(cancel)
+
+		testutil.Ok(t, q.WaitSumMetricsWithOptions(e2e.Equals(1), []string{"thanos_store_nodes_grpc_connections"}, e2e.WaitMissingMetrics))
+
+		// We expect the data from each Prometheus instance to be replicated twice across our ingesting instances
+		queryAndAssertSeries(t, ctx, q.HTTPEndpoint(), queryUpWithoutInstance, promclient.QueryOptions{
+			Deduplicate: false,
+		}, []model.Metric{
+			{
+				"job":        "myself",
+				"prometheus": "prom1",
+				"receive":    "ingestor",
+				"replica":    "0",
+				"tenant_id":  "default-tenant",
+			},
+		})
+	})
+}
+
+func cpyDir(scrDir, dest string) error {
+	entries, err := ioutil.ReadDir(scrDir)
+	if err != nil {
+		return err
+	}
+	for _, entry := range entries {
+		sourcePath := filepath.Join(scrDir, entry.Name())
+		destPath := filepath.Join(dest, entry.Name())
+
+		fileInfo, err := os.Stat(sourcePath)
+		if err != nil {
+			return err
+		}
+
+		stat, ok := fileInfo.Sys().(*syscall.Stat_t)
+		if !ok {
+			return fmt.Errorf("failed to get raw syscall.Stat_t data for '%s'", sourcePath)
+		}
+
+		switch fileInfo.Mode() & os.ModeType {
+		case os.ModeDir:
+			if err := os.MkdirAll(destPath, 0755); err != nil {
+				return err
+			}
+			if err := cpyDir(sourcePath, destPath); err != nil {
+				return err
+			}
+		case os.ModeSymlink:
+			return errors.New("symlink copy is not supported")
+		default:
+			if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
+				return err
+			}
+			if err := cpyFile(sourcePath, destPath); err != nil {
+				return err
+			}
+		}
+		if err := os.Lchown(destPath, int(stat.Uid), int(stat.Gid)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func cpyFile(srcFile, dstFile string) (err error) {
+	out, err := os.Create(dstFile)
+	if err != nil {
+		return err
+	}
+
+	defer runutil.CloseWithErrCapture(&err, out, "close dst")
+
+	in, err := os.Open(srcFile)
+	defer runutil.CloseWithErrCapture(&err, in, "close src")
+	if err != nil {
+		return err
+	}
+
+	_, err = io.Copy(out, in)
+	return err
 }

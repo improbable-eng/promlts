@@ -35,11 +35,33 @@ import (
 // NOTE: by using aggregation all results are now unsorted.
 const queryUpWithoutInstance = "sum(up) without (instance)"
 
+func defaultRemoteWriteEntry(remoteWriteEndpoint string) string {
+	return fmt.Sprintf(`remote_write:
+- url: "%s"
+  # Don't spam receiver on mistake.
+  queue_config:
+    min_backoff: 2s
+    max_backoff: 10s`, remoteWriteEndpoint)
+}
+
+func tlsRemoteWriteEntry(remoteWriteEndpoint, serverCAFile, clientKeyFile, clientCertFile string) string {
+	return fmt.Sprintf(`remote_write:
+- url: "%s"
+  # Don't spam receiver on mistake.
+  queue_config:
+    min_backoff: 2s
+    max_backoff: 10s
+  tls_config:
+    ca_file: %s
+    key_file: %s
+    cert_file: %s`, remoteWriteEndpoint, serverCAFile, clientKeyFile, clientCertFile)
+}
+
 // defaultPromConfig returns Prometheus config that sets Prometheus to:
 // * expose 2 external labels, source and replica.
 // * scrape fake target. This will produce up == 0 metric which we can assert on.
 // * optionally remote write endpoint to write into.
-func defaultPromConfig(name string, replica int, remoteWriteEndpoint, ruleFile string, scrapeTargets ...string) string {
+func defaultPromConfig(name string, replica int, remoteWriteEntry, ruleFile string, scrapeTargets ...string) string {
 	targets := "localhost:9090"
 	if len(scrapeTargets) > 0 {
 		targets = strings.Join(scrapeTargets, ",")
@@ -62,16 +84,11 @@ scrape_configs:
     action: drop
 `, name, replica, targets)
 
-	if remoteWriteEndpoint != "" {
+	if remoteWriteEntry != "" {
 		config = fmt.Sprintf(`
 %s
-remote_write:
-- url: "%s"
-  # Don't spam receiver on mistake.
-  queue_config:
-    min_backoff: 2s
-    max_backoff: 10s
-`, config, remoteWriteEndpoint)
+%s
+`, config, remoteWriteEntry)
 	}
 
 	if ruleFile != "" {
