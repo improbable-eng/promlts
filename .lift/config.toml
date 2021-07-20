@@ -1,0 +1,1 @@
+ignoreRules = [ "Severe OSS Vulnerability", "Critical OSS Vulnerability" ]
