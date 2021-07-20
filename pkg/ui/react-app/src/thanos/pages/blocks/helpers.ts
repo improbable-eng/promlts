@@ -1,4 +1,5 @@
 import { LabelSet, Block, BlocksPool } from './block';
+import { Fuzzy, FuzzyResult } from '@nexucis/fuzzy';
 
 const stringify = (map: LabelSet): string => {
   let t = '';
@@ -102,4 +103,18 @@ export const download = (blob: Block): string => {
   const url = window.URL.createObjectURL(new Blob([JSON.stringify(blob, null, 2)], { type: 'application/json' }));
 
   return url;
+};
+
+export const getBlockByUlid = (blocks: Block[], ulid: string): string => {
+  const ulidArray = blocks.map((block) => block.ulid);
+  const fuz = new Fuzzy({ caseSensitive: true });
+
+  const result: FuzzyResult[] = fuz.filter(ulid, ulidArray);
+
+  if (result.length > 0) {
+    let index = result[0].index;
+    return blocks[index].ulid;
+  }
+
+  return '';
 };

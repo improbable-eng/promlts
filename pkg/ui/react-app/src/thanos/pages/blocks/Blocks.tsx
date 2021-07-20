@@ -1,4 +1,4 @@
-import React, { FC, useMemo, useState } from 'react';
+import React, { ChangeEvent, FC, useMemo, useState } from 'react';
 import { RouteComponentProps } from '@reach/router';
 import { UncontrolledAlert } from 'reactstrap';
 import { useQueryParams, withDefault, NumberParam } from 'use-query-params';
@@ -8,10 +8,10 @@ import PathPrefixProps from '../../../types/PathPrefixProps';
 import { Block } from './block';
 import { SourceView } from './SourceView';
 import { BlockDetails } from './BlockDetails';
+import { BlockInput } from './BlockInput';
 import { sortBlocks } from './helpers';
 import styles from './blocks.module.css';
 import TimeRange from './TimeRange';
-
 export interface BlockListProps {
   blocks: Block[];
   err: string | null;
@@ -21,6 +21,8 @@ export interface BlockListProps {
 
 export const BlocksContent: FC<{ data: BlockListProps }> = ({ data }) => {
   const [selectedBlock, selectBlock] = useState<Block>();
+  const [searchState, setSearchState] = useState<string>('');
+  const [blockSearch, setBlockSearch] = useState<string>('');
 
   const { blocks, label, err } = data;
 
@@ -58,6 +60,10 @@ export const BlocksContent: FC<{ data: BlockListProps }> = ({ data }) => {
 
   return (
     <>
+      <BlockInput
+        onChange={({ target }: ChangeEvent<HTMLInputElement>): void => setSearchState(target.value)}
+        onClick={() => setBlockSearch(searchState)}
+      />
       {blocks.length > 0 ? (
         <div className={styles.container}>
           <div className={styles.grid}>
@@ -70,6 +76,7 @@ export const BlocksContent: FC<{ data: BlockListProps }> = ({ data }) => {
                   selectBlock={selectBlock}
                   gridMinTime={viewMinTime}
                   gridMaxTime={viewMaxTime}
+                  blockSearch={blockSearch}
                 />
               ))}
             </div>
