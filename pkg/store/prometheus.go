@@ -165,15 +165,17 @@ func (p *PrometheusStore) Series(r *storepb.SeriesRequest, s storepb.Store_Serie
 			return err
 		}
 		for _, lbm := range labelMaps {
-			lset := make([]labelpb.ZLabel, 0, len(lbm)+len(extLset))
-			for k, v := range lbm {
-				lset = append(lset, labelpb.ZLabel{Name: k, Value: v})
+			lset := make([]labelpb.ZLabel, 0, len(lbm))
+			keys := make([]string, 0)
+			for k, _ := range lbm {
+				keys = append(keys,k)
 			}
-			lset = append(lset, labelpb.ZLabelsFromPromLabels(extLset)...)
-			sort.Slice(lset, func(i, j int) bool {
-				return lset[i].Name < lset[j].Name
-			})
-			if err = s.Send(storepb.NewSeriesResponse(&storepb.Series{Labels: lset})); err != nil {
+			sort.Strings(keys)
+			for _, k := range keys {
+				lset = append(lset, labelpb.Zlabel{Name: k, Value: lbm[k]})
+			}
+			mergedset := labelpb.ExtendSortedLabels(lset, labelpb.ZLabelsFromPromLabels(extLset)...)
+			if err = s.Send(storepb.NewSeriesResponse(&storepb.Series{Labels: mergedset})); err != nil {
 				return err
 			}
 		}
