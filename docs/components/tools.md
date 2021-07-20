@@ -228,6 +228,21 @@ Flags:
       --log.format=logfmt       Log format to use. Possible options: logfmt or
                                 json.
       --log.level=info          Log filtering level.
+      --max-time=9999-12-31T23:59:59Z  
+                                End of time range limit to serve. Thanos tool
+                                bucket web will serve only blocks, which
+                                happened earlier than this value. Option can be
+                                a constant time in RFC3339 format or time
+                                duration relative to current time, such as -1d
+                                or 2h45m. Valid duration units are ms, s, m, h,
+                                d, w, y.
+      --min-time=0000-01-01T00:00:00Z  
+                                Start of time range limit to serve. Thanos tool
+                                bucket web will serve only blocks, which
+                                happened later than this value. Option can be a
+                                constant time in RFC3339 format or time duration
+                                relative to current time, such as -1d or 2h45m.
+                                Valid duration units are ms, s, m, h, d, w, y.
       --objstore.config=<content>  
                                 Alternative to 'objstore.config-file' flag
                                 (mutually exclusive). Content of YAML file that
@@ -240,6 +255,20 @@ Flags:
                                 https://thanos.io/tip/thanos/storage.md/#configuration
       --refresh=30m             Refresh interval to download metadata from
                                 remote storage
+      --selector.relabel-config=<content>  
+                                Alternative to 'selector.relabel-config-file'
+                                flag (mutually exclusive). Content of YAML file
+                                that contains relabeling configuration that
+                                allows selecting blocks. It follows native
+                                Prometheus relabel-config syntax. See format
+                                details:
+                                https://prometheus.io/docs/prometheus/latest/configuration/configuration/#relabel_config
+      --selector.relabel-config-file=<file-path>  
+                                Path to YAML file that contains relabeling
+                                configuration that allows selecting blocks. It
+                                follows native Prometheus relabel-config syntax.
+                                See format details:
+                                https://prometheus.io/docs/prometheus/latest/configuration/configuration/#relabel_config
       --timeout=5m              Timeout to download metadata from remote storage
       --tracing.config=<content>  
                                 Alternative to 'tracing.config-file' flag
