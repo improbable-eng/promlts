@@ -17,6 +17,7 @@ import (
 
 	"github.com/thanos-io/thanos/pkg/store/storepb"
 	"github.com/thanos-io/thanos/pkg/targets/targetspb"
+	"github.com/thanos-io/thanos/pkg/tracing"
 )
 
 // Proxy implements targetspb.Targets gRPC that fans out requests to given targetspb.Targets.
@@ -40,10 +41,14 @@ func NewProxy(logger log.Logger, targets func() []targetspb.TargetsClient) *Prox
 }
 
 func (s *Proxy) Targets(req *targetspb.TargetsRequest, srv targetspb.Targets_TargetsServer) error {
+	span, ctx := tracing.StartSpan(srv.Context(), "proxy_targets")
+	defer span.Finish()
+
 	var (
-		g, gctx  = errgroup.WithContext(srv.Context())
+		g, gctx  = errgroup.WithContext(ctx)
 		respChan = make(chan *targetspb.TargetDiscovery, 10)
 		targets  []*targetspb.TargetDiscovery
+		err      error
 	)
 
 	for _, targetsClient := range s.targets() {
@@ -72,7 +77,10 @@ func (s *Proxy) Targets(req *targetspb.TargetsRequest, srv targetspb.Targets_Tar
 	}
 
 	for _, t := range targets {
-		if err := srv.Send(targetspb.NewTargetsResponse(t)); err != nil {
+		tracing.DoInSpan(srv.Context(), "send_targets_response", func(_ context.Context) {
+			err = srv.Send(targetspb.NewTargetsResponse(t))
+		})
+		if err != nil {
 			return status.Error(codes.Unknown, errors.Wrap(err, "send targets response").Error())
 		}
 	}
@@ -88,7 +96,15 @@ type targetsStream struct {
 }
 
 func (stream *targetsStream) receive(ctx context.Context) error {
-	targets, err := stream.client.Targets(ctx, stream.request)
+	var (
+		err     error
+		targets targetspb.Targets_TargetsClient
+	)
+
+	tracing.DoInSpan(ctx, "receive_stream_request", func(ctx context.Context) {
+		targets, err = stream.client.Targets(ctx, stream.request)
+	})
+
 	if err != nil {
 		err = errors.Wrapf(err, "fetching targets from targets client %v", stream.client)
 

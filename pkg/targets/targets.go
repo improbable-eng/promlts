@@ -11,6 +11,7 @@ import (
 	"github.com/prometheus/prometheus/storage"
 	"github.com/thanos-io/thanos/pkg/store/storepb"
 	"github.com/thanos-io/thanos/pkg/targets/targetspb"
+	"github.com/thanos-io/thanos/pkg/tracing"
 )
 
 var _ UnaryClient = &GRPCClient{}
@@ -46,6 +47,9 @@ func NewGRPCClientWithDedup(ts targetspb.TargetsServer, replicaLabels []string) 
 }
 
 func (rr *GRPCClient) Targets(ctx context.Context, req *targetspb.TargetsRequest) (*targetspb.TargetDiscovery, storage.Warnings, error) {
+	span, ctx := tracing.StartSpan(ctx, "targets_request")
+	defer span.Finish()
+
 	resp := &targetsServer{ctx: ctx, targets: &targetspb.TargetDiscovery{
 		ActiveTargets:  make([]*targetspb.ActiveTarget, 0),
 		DroppedTargets: make([]*targetspb.DroppedTarget, 0),

@@ -717,6 +717,15 @@ func NewTargetsHandler(client targets.UnaryClient, enablePartialResponse bool) f
 	}
 
 	return func(r *http.Request) (interface{}, []error, *api.ApiError) {
+		span, ctx := tracing.StartSpan(r.Context(), "receive_http_request")
+		defer span.Finish()
+
+		var (
+			t        *targetspb.TargetDiscovery
+			warnings storage.Warnings
+			err      error
+		)
+
 		stateParam := r.URL.Query().Get("state")
 		state, ok := targetspb.TargetsRequest_State_value[strings.ToUpper(stateParam)]
 		if !ok {
@@ -731,7 +740,10 @@ func NewTargetsHandler(client targets.UnaryClient, enablePartialResponse bool) f
 			PartialResponseStrategy: ps,
 		}
 
-		t, warnings, err := client.Targets(r.Context(), req)
+		tracing.DoInSpan(ctx, "retrieve_targets", func(ctx context.Context) {
+			t, warnings, err = client.Targets(ctx, req)
+		})
+
 		if err != nil {
 			return nil, nil, &api.ApiError{Typ: api.ErrorInternal, Err: errors.Wrap(err, "retrieving targets")}
 		}
