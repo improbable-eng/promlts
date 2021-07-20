@@ -724,10 +724,13 @@ func (cg *Group) compact(ctx context.Context, dir string, planner Planner, comp 
 
 	// Once we have a plan we need to download the actual data.
 	begin := time.Now()
-
 	toCompactDirs := make([]string, 0, len(toCompact))
+
+	var eg errgroup.Group
 	for _, meta := range toCompact {
+		meta := meta
 		bdir := filepath.Join(dir, meta.ULID.String())
+		toCompactDirs = append(toCompactDirs, bdir)
 		for _, s := range meta.Compaction.Sources {
 			if _, ok := uniqueSources[s]; ok {
 				return false, ulid.ULID{}, halt(errors.Errorf("overlapping sources detected for plan %v", toCompact))
@@ -735,29 +738,35 @@ func (cg *Group) compact(ctx context.Context, dir string, planner Planner, comp 
 			uniqueSources[s] = struct{}{}
 		}
 
-		if err := block.Download(ctx, cg.logger, cg.bkt, meta.ULID, bdir); err != nil {
-			return false, ulid.ULID{}, retry(errors.Wrapf(err, "download block %s", meta.ULID))
-		}
+		eg.Go(func() error {
+			if err := block.Download(ctx, cg.logger, cg.bkt, meta.ULID, bdir); err != nil {
+				return retry(errors.Wrapf(err, "download block %s", meta.ULID))
+			}
 
-		// Ensure all input blocks are valid.
-		stats, err := block.GatherIndexHealthStats(cg.logger, filepath.Join(bdir, block.IndexFilename), meta.MinTime, meta.MaxTime)
-		if err != nil {
-			return false, ulid.ULID{}, errors.Wrapf(err, "gather index issues for block %s", bdir)
-		}
+			// Ensure all input blocks are valid.
+			stats, err := block.GatherIndexHealthStats(cg.logger, filepath.Join(bdir, block.IndexFilename), meta.MinTime, meta.MaxTime)
+			if err != nil {
+				return errors.Wrapf(err, "gather index issues for block %s", bdir)
+			}
 
-		if err := stats.CriticalErr(); err != nil {
-			return false, ulid.ULID{}, halt(errors.Wrapf(err, "block with not healthy index found %s; Compaction level %v; Labels: %v", bdir, meta.Compaction.Level, meta.Thanos.Labels))
-		}
+			if err := stats.CriticalErr(); err != nil {
+				return halt(errors.Wrapf(err, "block with not healthy index found %s; Compaction level %v; Labels: %v", bdir, meta.Compaction.Level, meta.Thanos.Labels))
+			}
 
-		if err := stats.Issue347OutsideChunksErr(); err != nil {
-			return false, ulid.ULID{}, issue347Error(errors.Wrapf(err, "invalid, but reparable block %s", bdir), meta.ULID)
-		}
+			if err := stats.Issue347OutsideChunksErr(); err != nil {
+				return issue347Error(errors.Wrapf(err, "invalid, but reparable block %s", bdir), meta.ULID)
+			}
 
-		if err := stats.PrometheusIssue5372Err(); !cg.acceptMalformedIndex && err != nil {
-			return false, ulid.ULID{}, errors.Wrapf(err,
-				"block id %s, try running with --debug.accept-malformed-index", meta.ULID)
-		}
-		toCompactDirs = append(toCompactDirs, bdir)
+			if err := stats.PrometheusIssue5372Err(); !cg.acceptMalformedIndex && err != nil {
+				return errors.Wrapf(err, "block id %s, try running with --debug.accept-malformed-index", meta.ULID)
+			}
+
+			return nil
+		})
+	}
+
+	if err := eg.Wait(); err != nil {
+		return false, ulid.ULID{}, err
 	}
 	level.Info(cg.logger).Log("msg", "downloaded and verified blocks; compacting blocks", "plan", fmt.Sprintf("%v", toCompactDirs), "duration", time.Since(begin))
 
