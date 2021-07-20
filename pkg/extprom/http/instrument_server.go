@@ -4,6 +4,7 @@
 package http
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
@@ -21,6 +22,7 @@ import (
 type InstrumentationMiddleware interface {
 	// NewHandler wraps the given HTTP handler for instrumentation.
 	NewHandler(handlerName string, handler http.Handler) http.HandlerFunc
+	InsertTenantIdentifier(next http.Handler) http.HandlerFunc
 }
 
 type nopInstrumentationMiddleware struct{}
@@ -28,6 +30,12 @@ type nopInstrumentationMiddleware struct{}
 func (ins nopInstrumentationMiddleware) NewHandler(handlerName string, handler http.Handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		handler.ServeHTTP(w, r)
+	}
+}
+
+func (ins nopInstrumentationMiddleware) InsertTenantIdentifier(next http.Handler) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		next.ServeHTTP(w, r)
 	}
 }
 
@@ -57,7 +65,7 @@ func NewInstrumentationMiddleware(reg prometheus.Registerer, buckets []float64) 
 				Help:    "Tracks the latencies for HTTP requests.",
 				Buckets: buckets,
 			},
-			[]string{"code", "handler", "method"},
+			[]string{"code", "handler", "method", "tenant_id"},
 		),
 
 		requestSize: promauto.With(reg).NewSummaryVec(
@@ -65,14 +73,14 @@ func NewInstrumentationMiddleware(reg prometheus.Registerer, buckets []float64) 
 				Name: "http_request_size_bytes",
 				Help: "Tracks the size of HTTP requests.",
 			},
-			[]string{"code", "handler", "method"},
+			[]string{"code", "handler", "method", "tenant_id"},
 		),
 
 		requestsTotal: promauto.With(reg).NewCounterVec(
 			prometheus.CounterOpts{
 				Name: "http_requests_total",
 				Help: "Tracks the number of HTTP requests.",
-			}, []string{"code", "handler", "method"},
+			}, []string{"code", "handler", "method", "tenant_id"},
 		),
 
 		responseSize: promauto.With(reg).NewSummaryVec(
@@ -80,11 +88,33 @@ func NewInstrumentationMiddleware(reg prometheus.Registerer, buckets []float64) 
 				Name: "http_response_size_bytes",
 				Help: "Tracks the size of HTTP responses.",
 			},
-			[]string{"code", "handler", "method"},
+			[]string{"code", "handler", "method", "tenant_id"},
 		),
 	}
 	return &ins
 }
+
+func getTenantIdentifier(ctx context.Context) string {
+	return ctx.Value("tenantID").(string)
+}
+
+// InsertTenantIdentifier inserts tenant identifier in metrics.
+func (ins *defaultInstrumentationMiddleware) InsertTenantIdentifier(next http.Handler) http.HandlerFunc {
+	return func (w http.ResponseWriter, r *http.Request) {
+		tenantIdentifier := getTenantIdentifier(r.Context())
+		if tenantIdentifier != "" {
+			ins.requestSize.CurryWith(prometheus.Labels{"tenant_id": tenantIdentifier})
+			ins.requestDuration.CurryWith(prometheus.Labels{"tenant_id": tenantIdentifier})
+			ins.requestsTotal.CurryWith(prometheus.Labels{"tenant_id": tenantIdentifier})
+			// ins.responseSize.CurryWith(prometheus.Labels{"tenant_id": tenantIdentifier})			
+		}
+		next.ServeHTTP(w, r)
+	}
+}
+
+// func (ins *defaultInstrumentationMiddleware) InsertTenantIdentifier(next http.Handler) http.HandlerFunc{
+// 	ins.requestSize.MustCurryWith(prometheus.Labels{"tenan_id": "tenantIdentifier"})
+// }
 
 // NewHandler wraps the given HTTP handler for instrumentation. It
 // registers four metric collectors (if not already done) and reports HTTP
