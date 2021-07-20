@@ -55,7 +55,7 @@ The `thanos` binary should now be in your `$PATH` and is the only thing required
 
 ## Contributing
 
-Contributions are very welcome! See our [CONTRIBUTING.md](../CONTRIBUTING.md) for more information.
+Contributions are very welcome! See our [CONTRIBUTING.md](https://github.com/thanos-io/thanos/tree/main/CONTRIBUTING.md) for more information.
 
 ## Community
 
@@ -66,7 +66,7 @@ Thanos is an open source project and we value and welcome new contributors and m
 
 ## Maintainers
 
-See [MAINTAINERS.md](../MAINTAINERS.md).
+See [MAINTAINERS.md](https://github.com/thanos-io/thanos/tree/main/MAINTAINERS.md).
 
 ## Community Thanos Kubernetes Applications
 
@@ -87,7 +87,7 @@ If you want to add yourself to this list, let us know!
 
 ## Operating
 
-See up to date [jsonnet mixins](https://github.com/thanos-io/thanos/tree/main/mixin/README.md) We also have example Grafana dashboards [here](../examples/dashboards/dashboards.md) and some [alerts](../examples/alerts/alerts.md) to get you started.
+See up to date [jsonnet mixins](https://github.com/thanos-io/thanos/tree/main/mixin/README.md) We also have example Grafana dashboards [here](https://github.com/thanos-io/thanos/tree/main/examples/dashboards/dashboards.md) and some [alerts](https://github.com/thanos-io/thanos/tree/main/examples/alerts/alerts.md) to get you started.
 
 ## Talks
 
@@ -152,4 +152,4 @@ However, in case you want to play and run Thanos components on a single node, we
 | Compact        | HTTP                    | 10912 |
 | Query Frontend | HTTP                    | 10913 |
 
-You can see example one-node setup [here](../scripts/quickstart.sh).
+You can see example one-node setup [here](https://github.com/thanos-io/thanos/tree/main/scripts/quickstart.sh).

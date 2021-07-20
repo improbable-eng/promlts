@@ -91,7 +91,7 @@ EOF
 # Add edit footer to all markdown files assumed as content.
 ALL_DOC_CONTENT_FILES=$(echo "${OUTPUT_CONTENT_DIR}/**/*.md")
 for file in ${ALL_DOC_CONTENT_FILES}; do
-  relFile=${file##${OUTPUT_CONTENT_DIR}/}
+  relFile=${file##${OUTPUT_CONTENT_DIR}/thanos/}
   echo "$(
     cat <<EOF
 
