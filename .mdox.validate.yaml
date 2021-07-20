@@ -1,0 +1,20 @@
+version: 1
+
+validators:
+  # Smart validators to skip checking PR/issue links of Thanos, Prometheus and Cortex.
+  - regex: 'thanos-io\/thanos'
+    type: 'github'
+  - regex: 'prometheus\/prometheus'
+    type: 'github'
+  - regex: 'cortexproject\/cortex'
+    type: 'github'
+  # Causes http stream errors with statuscode 0 sometimes. But is safe to skip.
+  - regex: 'slack\.cncf\.io'
+    type: 'ignore'
+  # 301 errors even when curl-ed.
+  - regex: 'envoyproxy\.io'
+    type: 'ignore'
+  # Due to rate limiting, mdox link checking is a time consuming process. 
+  # Uncommenting the fields below will allow mdox to skip all GitHub links and speed up check significantly.
+  # - regex: 'github'
+  #   type: 'ignore'

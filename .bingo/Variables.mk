@@ -89,11 +89,11 @@ $(JSONNETFMT): $(BINGO_DIR)/jsonnetfmt.mod
 	@echo "(re)installing $(GOBIN)/jsonnetfmt-v0.17.0"
 	@cd $(BINGO_DIR) && $(GO) build -mod=mod -modfile=jsonnetfmt.mod -o=$(GOBIN)/jsonnetfmt-v0.17.0 "github.com/google/go-jsonnet/cmd/jsonnetfmt"
 
-MDOX := $(GOBIN)/mdox-v0.2.2-0.20210617084122-22b44c491197
+MDOX := $(GOBIN)/mdox-v0.2.2-0.20210617120014-ffae630a4141
 $(MDOX): $(BINGO_DIR)/mdox.mod
 	@# Install binary/ries using Go 1.14+ build command. This is using bwplotka/bingo-controlled, separate go module with pinned dependencies.
-	@echo "(re)installing $(GOBIN)/mdox-v0.2.2-0.20210617084122-22b44c491197"
-	@cd $(BINGO_DIR) && $(GO) build -mod=mod -modfile=mdox.mod -o=$(GOBIN)/mdox-v0.2.2-0.20210617084122-22b44c491197 "github.com/bwplotka/mdox"
+	@echo "(re)installing $(GOBIN)/mdox-v0.2.2-0.20210617120014-ffae630a4141"
+	@cd $(BINGO_DIR) && $(GO) build -mod=mod -modfile=mdox.mod -o=$(GOBIN)/mdox-v0.2.2-0.20210617120014-ffae630a4141 "github.com/bwplotka/mdox"
 
 MINIO := $(GOBIN)/minio-v0.0.0-20200527010300-cccf2de129da
 $(MINIO): $(BINGO_DIR)/minio.mod

@@ -1,10 +1,4 @@
----
-type: docs
-title: Running Thanos with HTTPS and basic auth
-menu: operating
----
-
-# HTTPS and authentication
+# Running Thanos with HTTPS and basic authentication
 
 Thanos supports basic authentication and TLS. This is **experimental** and might change in the future.
 

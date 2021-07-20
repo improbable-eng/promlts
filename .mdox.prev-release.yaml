@@ -1,0 +1,72 @@
+version: 1
+
+inputDir: "$(OUTPUT_CONTENT_DIR)/$(tags)-git-docs"
+outputDir: "$(OUTPUT_CONTENT_DIR)/$(tags)"
+extraInputGlobs:
+  - "CHANGELOG.md"
+  - "SECURITY.md"
+  - "MAINTAINERS.md"
+  - "CONTRIBUTING.md"
+  - "CODE_OF_CONDUCT.md"
+
+gitIgnored: true
+localLinksStyle:
+  hugo:
+    indexFileName: "_index.md"
+
+transformations:
+
+  - glob: "../../../CHANGELOG.md"
+    path: /thanos/CHANGELOG.md
+    frontMatter:
+      template: |
+        title: Changelog
+        type: docs
+        menu: thanos
+        lastmod: "{{ .Origin.LastMod }}"
+
+  - glob: "../../../MAINTAINERS.md"
+    path: /thanos/MAINTAINERS.md
+    frontMatter:
+      template: |
+        title: Maintainers
+        type: docs
+        menu: thanos
+        lastmod: "{{ .Origin.LastMod }}"
+
+  - glob: "../../../SECURITY.md"
+    path: /thanos/SECURITY.md
+    frontMatter:
+      template: |
+        title: Security
+        type: docs
+        menu: thanos
+        lastmod: "{{ .Origin.LastMod }}"
+
+  - glob: "../../../CODE_OF_CONDUCT.md"
+    path: /contributing/CODE_OF_CONDUCT.md
+    frontMatter:
+      template: |
+        title: Code of Conduct
+        type: docs
+        menu: contributing
+        lastmod: "{{ .Origin.LastMod }}"
+
+  - glob: "../../../CONTRIBUTING.md"
+    path: /contributing/CONTRIBUTING.md
+    frontMatter:
+      template: |
+        title: Contributing
+        type: docs
+        menu: contributing
+        lastmod: "{{ .Origin.LastMod }}"
+  
+  # TODO(saswatamcode): add a new file just via mdox
+  # - glob: "README.md"
+  #   path: /thanos/_index.md
+  #   frontMatter:
+  #     template: |
+  #       title: "{{ .Origin.FirstHeader }}"
+
+  - glob: "*.md"
+    path: /thanos/*

@@ -75,6 +75,6 @@ This potentially makes the receiver more difficult to operate and understandable
 
 #### Flag for current Receiver: --receive-route
 
-Idea would be similar same as in [Proposal](#Proposal), but there will be explicit flag to turn off local storage capabilities.
+Idea would be similar same as in [Proposal](#proposal), but there will be explicit flag to turn off local storage capabilities.
 
 I think we can have much more understandable logic if *we simply not* configure hashring for **ingesting receivers** and not configure local hashring endpoint to notify that such Receiver instance will never store anything.

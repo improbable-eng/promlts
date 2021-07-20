@@ -72,7 +72,7 @@ This design is trying to address those four problems.
 ## No Goals
 
 * Removing initial startup for Thanos Store Gateway completely as designed in [Cortex, no initial block sync](https://github.com/thanos-io/thanos/issues/1813)
-  * However this proposal might be a step towards that as we might be able to load and build index-cache/index quickly on demand from disk. See [Future Work](./201912_thanos_binary_index_header.md#Future-work)
+  * However this proposal might be a step towards that as we might be able to load and build index-cache/index quickly on demand from disk. See [Future Work](#future-work)
   * At the same time be able to load `index-header` at query time directly from bucket is not a goal of this proposal.
 * Decreasing size. While it would be nice to use less space; our aim is latency of building/loading the block. That might be correlated with size, but not necessarily (e.g when extra considering compression)
 
@@ -99,7 +99,7 @@ With that effort building time and resources should be compared with downloading
 
 Thanks to this format we can reuse most of the [FileReader](https://github.com/prometheus/prometheus/blob/de0a772b8e7d27dc744810a1a693d97be027049a/tsdb/index/index.go#L664) code to load file.
 
-Thanos will build/compose all index-headers on the startup for now, however in theory we can load and build those blocks on demand. Given the minimal memory that each loaded block should take now, this is described as [Future Work](./201912_thanos_binary_index_header.md#Future-Work)
+Thanos will build/compose all index-headers on the startup for now, however in theory we can load and build those blocks on demand. Given the minimal memory that each loaded block should take now, this is described as [Future Work](#future-work)
 
 ### Length of Posting to fetch
 
@@ -107,7 +107,7 @@ While idea of combing different pieces of TSDB index as our index-header is grea
 
 We need to know apriori how to partition and how many bytes we need to fetch from the storage to get each posting: https://github.com/thanos-io/thanos/blob/7e11afe64af0c096743a3de8a594616abf52be45/pkg/store/bucket.go#L1567
 
-To calculate those sizes we use [`indexr.PostingsRanges()`](https://github.com/thanos-io/thanos/blob/7e11afe64af0c096743a3de8a594616abf52be45/pkg/block/index.go#L156-L155) which scans through `posting` section of the TSDB index. Having to fetch whole postings section just to get size of each posting makes this proposal less valuable as we still need to download big part of index and traverse through it instead of what we propose in [#Proposal](./201912_thanos_binary_index_header.md#proposal)
+To calculate those sizes we use [`indexr.PostingsRanges()`](https://github.com/thanos-io/thanos/blob/7e11afe64af0c096743a3de8a594616abf52be45/pkg/block/index.go#L156-L155) which scans through `posting` section of the TSDB index. Having to fetch whole postings section just to get size of each posting makes this proposal less valuable as we still need to download big part of index and traverse through it instead of what we propose in [#Proposal](#proposal)
 
 For series we don't know the exact size either, however we estimate max size of each series to be 64*1024. It depends on sane number of label pairs and chunks per series. We have really only one potential case when this was too low: https://github.com/thanos-io/thanos/issues/552. Decision about series this was made here: https://github.com/thanos-io/thanos/issues/146
 

@@ -1,8 +1,4 @@
----
-type: docs
-title: Sharding
-menu: thanos
----
+# Sharding
 
 # Background
 
@@ -22,7 +18,7 @@ Queries against store gateway which are touching large number of blocks (no matt
 
 # Relabelling
 
-Similar to [promtail](https://github.com/grafana/loki/blob/master/docs/clients/promtail/configuration.md#relabel_config) this config will follow native [Prometheus relabel-config](https://prometheus.io/docs/prometheus/latest/configuration/configuration/#relabel_config) syntax.
+Similar to [promtail](https://grafana.com/docs/loki/latest/clients/promtail/configuration/#relabel_configs) this config will follow native [Prometheus relabel-config](https://prometheus.io/docs/prometheus/latest/configuration/configuration/#relabel_config) syntax.
 
 Now, thanos only support following relabel actions:
 

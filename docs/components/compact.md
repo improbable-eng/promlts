@@ -1,9 +1,3 @@
----
-type: docs
-title: Compactor
-menu: components
----
-
 # Compactor
 
 The `thanos compact` command applies the compaction procedure of the Prometheus 2.0 storage engine to block data stored in object storage. It is generally not semantically concurrency safe and must be deployed as a singleton against a bucket.

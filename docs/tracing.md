@@ -1,9 +1,3 @@
----
-type: docs
-title: Tracing
-menu: thanos
----
-
 # Tracing
 
 Thanos supports different tracing backends that implements `opentracing.Tracer` interface.

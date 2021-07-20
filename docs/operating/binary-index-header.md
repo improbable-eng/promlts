@@ -1,9 +1,3 @@
----
-type: docs
-title: Binary index-header
-menu: operating
----
-
 # Binary index-header
 
 In order to query series inside blocks from object storage, [Store Gateway](../components/store.md) has to know certain initial info about each block such as:

@@ -82,7 +82,7 @@ To make this happen we will propose a small refactor in Cortex code to avoid unn
 
 #### Don't add anything, document Cortex query frontend and add examples of usage
 
-Unfortunately we tried this path already without success. Reasons were mentioned in [Motivation](202004_embedd_cortex_frontend.md#Motivation)
+Unfortunately we tried this path already without success. Reasons were mentioned in [Motivation](#motivation)
 
 #### Add response caching to Querier itself, in the same process.
 

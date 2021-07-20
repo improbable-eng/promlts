@@ -1,10 +1,4 @@
----
-type: docs
-title: Use cases
-menu: operating
----
-
-# Overview
+# Use Cases
 
 There are many great use cases of [Thanos](https://thanos.io/), we collect them here for others to refer to.
 

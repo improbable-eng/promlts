@@ -1,9 +1,3 @@
----
-type: docs
-title: Troubleshooting
-menu: operating
----
-
 # Troubleshooting; Common cases
 
 ## Overlaps
@@ -23,7 +17,7 @@ In this halted example, we can read that compactor detected 2 overlapped blocks.
 * Duplicated upload with different ULID (non-persistent storage for Prometheus can cause this)
 * 2 Prometheus instances are misconfigured and they are uploading the data with exactly the same external labels. This is wrong, they should be unique.
 
-Checking producers log for such ULID, and checking meta.json (e.g if sample stats are the same or not) helps. Checksum the index and [chunks files](../design.md/#chunk-file) as well to reveal if data is exactly the same, thus ok to be removed manually. You may find `scripts/thanos-block.jq` script useful when inspecting `meta.json` files, as it translates timestamps to human-readable form.
+Checking producers log for such ULID, and checking meta.json (e.g if sample stats are the same or not) helps. Checksum the index and [chunks files](../design.md#chunk-file) as well to reveal if data is exactly the same, thus ok to be removed manually. You may find `scripts/thanos-block.jq` script useful when inspecting `meta.json` files, as it translates timestamps to human-readable form.
 
 ### Reasons
 
@@ -31,7 +25,7 @@ Checking producers log for such ULID, and checking meta.json (e.g if sample stat
 - Misconfiguraiton of sidecar/ruler: Same external labels or no external labels across many block producers.
 - Running multiple compactors for single block "stream", even for short duration.
 - Manually uploading blocks to the bucket.
-- Eventually consistent block storage until we fully implement [RW for bucket](https://thanos.io/tip/proposals/201901-read-write-operations-bucket.md)
+- Eventually consistent block storage until we fully implement [RW for bucket](https://thanos.io/tip/proposals-done/201901-read-write-operations-bucket.md)
 
 ### Solutions
 

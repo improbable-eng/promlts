@@ -1,10 +1,3 @@
----
-weight: 1
-type: docs
-title: Quick Tutorial
-menu: thanos
----
-
 # Quick Tutorial
 
 Feel free to check the free, in-browser interactive tutorial [as Katacoda Thanos Course](https://katacoda.com/thanos/courses/thanos) We will be progressively updating our Katacoda Course with more scenarios.
@@ -57,7 +50,7 @@ The purpose of the Sidecar is to backup Prometheus data into an Object Storage b
 
 The Sidecar makes use of the `reload` Prometheus endpoint. Make sure it's enabled with the flag `--web.enable-lifecycle`.
 
-[Component sidecar documentation](../components/sidecar.md)
+[Component sidecar documentation](components/sidecar.md)
 
 ### External storage
 
@@ -82,7 +75,7 @@ If you are not interested in backing up any data, the `--objstore.config-file` f
 
 ### Store API
 
-The Sidecar component implements and exposes a gRPC *[Store API](/pkg/store/storepb/rpc.proto#L19)*. The sidecar implementation allows you to query the metric data stored in Prometheus.
+The Sidecar component implements and exposes a gRPC *[Store API](https://github.com/thanos-io/thanos/blob/main/pkg/store/storepb/rpc.proto#L27)*. The sidecar implementation allows you to query the metric data stored in Prometheus.
 
 Let's extend the Sidecar in the previous section to connect to a Prometheus server, and expose the Store API.
 
@@ -117,7 +110,7 @@ global:
 
 ## Querier/Query
 
-Now that we have setup the Sidecar for one or more Prometheus instances, we want to use Thanos' global [Query Layer](../components/query.md) to evaluate PromQL queries against all instances at once.
+Now that we have setup the Sidecar for one or more Prometheus instances, we want to use Thanos' global [Query Layer](components/query.md) to evaluate PromQL queries against all instances at once.
 
 The Query component is stateless and horizontally scalable and can be deployed with any number of replicas. Once connected to the Sidecars, it automatically detects which Prometheus servers need to be contacted for a given PromQL query.
 
@@ -135,7 +128,7 @@ thanos query \
 
 Go to the configured HTTP address that should now show a UI similar to that of Prometheus. If the cluster formed correctly you can now query across all Prometheus instances within the cluster. You can also check the Stores page to check up on your stores.
 
-[Query documentation](../components/query.md)
+[Query documentation](components/query.md)
 
 ### Deduplicating Data from Prometheus HA pairs
 
@@ -204,7 +197,7 @@ The store gateway occupies small amounts of disk space for caching basic informa
 
 * *[Example Kubernetes manifest](https://github.com/thanos-io/kube-thanos/blob/master/manifests/thanos-store-statefulSet.yaml)*
 
-[Store Gateway documentation](../components/store.md)
+[Store Gateway documentation](components/store.md)
 
 ## Compactor
 
@@ -225,10 +218,10 @@ The compactor is not in the critical path of querying or data backup. It can eit
 
 * *[Example Kubernetes manifest](https://github.com/thanos-io/kube-thanos/blob/master/examples/all/manifests/thanos-compact-statefulSet.yaml)*
 
-[Compactor documentation](../components/compact.md)
+[Compactor documentation](components/compact.md)
 
 ## Ruler/Rule
 
-In case of Prometheus with Thanos sidecar does not have enough retention, or if you want to have alerts or recording rules that requires global view, Thanos has just the component for that: the [Ruler](../components/rule.md), which does rule and alert evaluation on top of a given Thanos Querier.
+In case of Prometheus with Thanos sidecar does not have enough retention, or if you want to have alerts or recording rules that requires global view, Thanos has just the component for that: the [Ruler](components/rule.md), which does rule and alert evaluation on top of a given Thanos Querier.
 
-[Rule documentation](../components/rule.md)
+[Rule documentation](components/rule.md)

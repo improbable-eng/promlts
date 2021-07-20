@@ -1,9 +1,3 @@
----
-type: docs
-title: Governance
-menu: thanos
----
-
 # Governance
 
 This document describes the rules and governance of the project. It is a slightly modified version of the [Prometheus Governance](https://prometheus.io/governance/#governance-changes).
