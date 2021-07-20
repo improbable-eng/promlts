@@ -30,29 +30,29 @@ func (s sample) V() float64 {
 	return s.v
 }
 
-type series struct {
+type testSeries struct {
 	lset    labels.Labels
 	samples []sample
 }
 
-func (s series) Labels() labels.Labels { return s.lset }
-func (s series) Iterator() chunkenc.Iterator {
+func (s testSeries) Labels() labels.Labels { return s.lset }
+func (s testSeries) Iterator() chunkenc.Iterator {
 	return newMockedSeriesIterator(s.samples)
 }
 
 // TODO(bwplotka): Reuse SeriesSets from chunk iterators from Prometheus.
 type mockedSeriesSet struct {
-	series []series
-	cur    int
+	testSeries []testSeries
+	cur        int
 }
 
 func (s *mockedSeriesSet) Next() bool {
 	s.cur++
-	return s.cur <= len(s.series)
+	return s.cur <= len(s.testSeries)
 }
 
 func (s *mockedSeriesSet) At() storage.Series {
-	return s.series[s.cur-1]
+	return s.testSeries[s.cur-1]
 }
 func (s *mockedSeriesSet) Err() error { return nil }
 
@@ -110,16 +110,23 @@ var expectedRealSeriesWithStaleMarkerDeduplicatedForRate = []sample{
 }
 
 func TestDedupSeriesSet(t *testing.T) {
-	tests := []struct {
-		input       []series
-		exp         []series
+	for _, tcase := range []struct {
+		name        string
+		input       []testSeries
+		exp         []testSeries
 		dedupLabels map[string]struct{}
 		isCounter   bool
 	}{
 		{
-			// Single dedup label.
-			input: []series{
+			name: "no dedup label",
+			input: []testSeries{
 				{
+					lset:    labels.Labels{{Name: "a", Value: "1"}, {Name: "c", Value: "3"}},
+					samples: []sample{{10000, 1}, {20000, 2}},
+				}, {
+					lset:    labels.Labels{{Name: "a", Value: "1"}, {Name: "c", Value: "3"}, {Name: "d", Value: "4"}},
+					samples: []sample{{10000, 1}, {20000, 2}},
+				}, {
 					lset:    labels.Labels{{Name: "a", Value: "1"}, {Name: "c", Value: "3"}, {Name: "replica", Value: "replica-1"}},
 					samples: []sample{{10000, 1}, {20000, 2}},
 				}, {
@@ -128,12 +135,6 @@ func TestDedupSeriesSet(t *testing.T) {
 				}, {
 					lset:    labels.Labels{{Name: "a", Value: "1"}, {Name: "c", Value: "3"}, {Name: "replica", Value: "replica-3"}},
 					samples: []sample{{200000, 5}, {210000, 6}},
-				}, {
-					lset:    labels.Labels{{Name: "a", Value: "1"}, {Name: "c", Value: "3"}, {Name: "d", Value: "4"}},
-					samples: []sample{{10000, 1}, {20000, 2}},
-				}, {
-					lset:    labels.Labels{{Name: "a", Value: "1"}, {Name: "c", Value: "3"}},
-					samples: []sample{{10000, 1}, {20000, 2}},
 				}, {
 					lset:    labels.Labels{{Name: "a", Value: "1"}, {Name: "c", Value: "4"}, {Name: "replica", Value: "replica-1"}},
 					samples: []sample{{10000, 1}, {20000, 2}},
@@ -145,24 +146,72 @@ func TestDedupSeriesSet(t *testing.T) {
 					samples: []sample{{60000, 3}, {70000, 4}},
 				},
 			},
-			exp: []series{
+			exp: []testSeries{
+				{
+					lset:    labels.Labels{{Name: "a", Value: "1"}, {Name: "c", Value: "3"}},
+					samples: []sample{{10000, 1}, {20000, 2}},
+				}, {
+					lset:    labels.Labels{{Name: "a", Value: "1"}, {Name: "c", Value: "3"}, {Name: "d", Value: "4"}},
+					samples: []sample{{10000, 1}, {20000, 2}},
+				}, {
+					lset:    labels.Labels{{Name: "a", Value: "1"}, {Name: "c", Value: "3"}, {Name: "replica", Value: "replica-1"}},
+					samples: []sample{{10000, 1}, {20000, 2}},
+				}, {
+					lset:    labels.Labels{{Name: "a", Value: "1"}, {Name: "c", Value: "3"}, {Name: "replica", Value: "replica-2"}},
+					samples: []sample{{60000, 3}, {70000, 4}},
+				}, {
+					lset:    labels.Labels{{Name: "a", Value: "1"}, {Name: "c", Value: "3"}, {Name: "replica", Value: "replica-3"}},
+					samples: []sample{{200000, 5}, {210000, 6}},
+				}, {
+					lset:    labels.Labels{{Name: "a", Value: "1"}, {Name: "c", Value: "4"}, {Name: "replica", Value: "replica-1"}},
+					samples: []sample{{10000, 1}, {20000, 2}},
+				}, {
+					lset:    labels.Labels{{Name: "a", Value: "2"}, {Name: "c", Value: "3"}, {Name: "replica", Value: "replica-3"}},
+					samples: []sample{{10000, 1}, {20000, 2}, {60000, 3}, {70000, 4}},
+				},
+			},
+			dedupLabels: map[string]struct{}{},
+		},
+		{
+			name: "single dedup label",
+			input: []testSeries{
+				{
+					lset:    labels.Labels{{Name: "a", Value: "1"}, {Name: "c", Value: "3"}},
+					samples: []sample{{10000, 1}, {20000, 2}},
+				}, {
+					lset:    labels.Labels{{Name: "a", Value: "1"}, {Name: "c", Value: "3"}, {Name: "d", Value: "4"}},
+					samples: []sample{{10000, 1}, {20000, 2}},
+				}, {
+					lset:    labels.Labels{{Name: "a", Value: "1"}, {Name: "c", Value: "3"}, {Name: "replica", Value: "replica-1"}},
+					samples: []sample{{10000, 1}, {20000, 2}},
+				}, {
+					lset:    labels.Labels{{Name: "a", Value: "1"}, {Name: "c", Value: "3"}, {Name: "replica", Value: "replica-2"}},
+					samples: []sample{{60000, 3}, {70000, 4}},
+				}, {
+					lset:    labels.Labels{{Name: "a", Value: "1"}, {Name: "c", Value: "3"}, {Name: "replica", Value: "replica-3"}},
+					samples: []sample{{200000, 5}, {210000, 6}},
+				}, {
+					lset:    labels.Labels{{Name: "a", Value: "1"}, {Name: "c", Value: "4"}, {Name: "replica", Value: "replica-1"}},
+					samples: []sample{{10000, 1}, {20000, 2}},
+				}, {
+					lset:    labels.Labels{{Name: "a", Value: "2"}, {Name: "c", Value: "3"}, {Name: "replica", Value: "replica-3"}},
+					samples: []sample{{10000, 1}, {20000, 2}},
+				}, {
+					lset:    labels.Labels{{Name: "a", Value: "2"}, {Name: "c", Value: "3"}, {Name: "replica", Value: "replica-3"}},
+					samples: []sample{{60000, 3}, {70000, 4}},
+				},
+			},
+			exp: []testSeries{
 				{
 					lset:    labels.Labels{{Name: "a", Value: "1"}, {Name: "c", Value: "3"}},
 					samples: []sample{{10000, 1}, {20000, 2}, {60000, 3}, {70000, 4}, {200000, 5}, {210000, 6}},
-				},
-				{
+				}, {
 					lset:    labels.Labels{{Name: "a", Value: "1"}, {Name: "c", Value: "3"}, {Name: "d", Value: "4"}},
 					samples: []sample{{10000, 1}, {20000, 2}},
-				},
-				{
-					lset:    labels.Labels{{Name: "a", Value: "1"}, {Name: "c", Value: "3"}},
-					samples: []sample{{10000, 1}, {20000, 2}},
-				},
-				{
+				}, {
 					lset:    labels.Labels{{Name: "a", Value: "1"}, {Name: "c", Value: "4"}},
 					samples: []sample{{10000, 1}, {20000, 2}},
-				},
-				{
+				}, {
 					lset:    labels.Labels{{Name: "a", Value: "2"}, {Name: "c", Value: "3"}},
 					samples: []sample{{10000, 1}, {20000, 2}, {60000, 3}, {70000, 4}},
 				},
@@ -172,10 +221,61 @@ func TestDedupSeriesSet(t *testing.T) {
 			},
 		},
 		{
-			// Regression tests against: https://github.com/thanos-io/thanos/issues/2645.
-			// We were panicking on requests with more replica labels than overall labels in any series.
-			input: []series{
+			name: "single dedup label in the middle of testSeries",
+			input: []testSeries{
 				{
+					lset:    labels.Labels{{Name: "a", Value: "1"}, {Name: "b", Value: "replica-1"}, {Name: "c", Value: "3"}},
+					samples: []sample{{10000, 1}, {20000, 2}},
+				}, {
+					lset:    labels.Labels{{Name: "a", Value: "1"}, {Name: "b", Value: "replica-1"}, {Name: "c", Value: "4"}},
+					samples: []sample{{10000, 1}, {20000, 2}},
+				}, {
+					lset:    labels.Labels{{Name: "a", Value: "1"}, {Name: "b", Value: "replica-2"}, {Name: "c", Value: "3"}},
+					samples: []sample{{60000, 3}, {70000, 4}},
+				}, {
+					lset:    labels.Labels{{Name: "a", Value: "1"}, {Name: "b", Value: "replica-3"}, {Name: "c", Value: "3"}},
+					samples: []sample{{200000, 5}, {210000, 6}},
+				}, {
+					lset:    labels.Labels{{Name: "a", Value: "1"}, {Name: "c", Value: "3"}},
+					samples: []sample{{10000, 1}, {20000, 2}},
+				}, {
+					lset:    labels.Labels{{Name: "a", Value: "1"}, {Name: "c", Value: "3"}, {Name: "d", Value: "4"}},
+					samples: []sample{{10000, 1}, {20000, 2}},
+				}, {
+					lset:    labels.Labels{{Name: "a", Value: "2"}, {Name: "b", Value: "replica-3"}, {Name: "c", Value: "3"}},
+					samples: []sample{{60000, 3}, {70000, 4}},
+				}, {
+					lset:    labels.Labels{{Name: "a", Value: "2"}, {Name: "b", Value: "replica-3"}, {Name: "c", Value: "3"}},
+					samples: []sample{{10000, 1}, {20000, 2}},
+				},
+			},
+			exp: []testSeries{
+				{
+					lset:    labels.Labels{{Name: "a", Value: "1"}, {Name: "c", Value: "3"}},
+					samples: []sample{{10000, 1}, {20000, 2}, {60000, 3}, {70000, 4}, {200000, 5}, {210000, 6}},
+				}, {
+					lset:    labels.Labels{{Name: "a", Value: "1"}, {Name: "c", Value: "3"}, {Name: "d", Value: "4"}},
+					samples: []sample{{10000, 1}, {20000, 2}},
+				}, {
+					lset:    labels.Labels{{Name: "a", Value: "1"}, {Name: "c", Value: "4"}},
+					samples: []sample{{10000, 1}, {20000, 2}},
+				}, {
+					lset:    labels.Labels{{Name: "a", Value: "2"}, {Name: "c", Value: "3"}},
+					samples: []sample{{10000, 1}, {20000, 2}, {60000, 3}, {70000, 4}},
+				},
+			},
+			dedupLabels: map[string]struct{}{
+				"b": {},
+			},
+		},
+		{
+			// Regression tests against: https://github.com/thanos-io/thanos/issues/2645.
+			name: "more replica labels than overall labels in any testSeries",
+			input: []testSeries{
+				{
+					lset:    labels.Labels{{Name: "a", Value: "1"}, {Name: "c", Value: "3"}, {Name: "d", Value: "4"}},
+					samples: []sample{{10000, 1}, {20000, 2}},
+				}, {
 					lset:    labels.Labels{{Name: "a", Value: "1"}, {Name: "c", Value: "3"}, {Name: "replica", Value: "replica-1"}},
 					samples: []sample{{10000, 1}, {20000, 2}},
 				}, {
@@ -184,12 +284,9 @@ func TestDedupSeriesSet(t *testing.T) {
 				}, {
 					lset:    labels.Labels{{Name: "a", Value: "1"}, {Name: "c", Value: "3"}, {Name: "replica", Value: "replica-3"}},
 					samples: []sample{{100000, 10}, {150000, 20}},
-				}, {
-					lset:    labels.Labels{{Name: "a", Value: "1"}, {Name: "c", Value: "3"}, {Name: "d", Value: "4"}},
-					samples: []sample{{10000, 1}, {20000, 2}},
 				},
 			},
-			exp: []series{
+			exp: []testSeries{
 				{
 					lset:    labels.Labels{{Name: "a", Value: "1"}, {Name: "c", Value: "3"}},
 					samples: []sample{{10000, 1}, {20000, 2}, {60000, 3}, {70000, 4}, {100000, 10}, {150000, 20}},
@@ -202,9 +299,15 @@ func TestDedupSeriesSet(t *testing.T) {
 			dedupLabels: map[string]struct{}{"replica": {}, "replica2": {}, "replica3": {}, "replica4": {}, "replica5": {}, "replica6": {}, "replica7": {}},
 		},
 		{
-			// Multi dedup label.
-			input: []series{
+			name: "multi dedup label",
+			input: []testSeries{
 				{
+					lset:    labels.Labels{{Name: "a", Value: "1"}, {Name: "c", Value: "3"}},
+					samples: []sample{{10000, 1}, {20000, 2}},
+				}, {
+					lset:    labels.Labels{{Name: "a", Value: "1"}, {Name: "c", Value: "3"}, {Name: "d", Value: "4"}},
+					samples: []sample{{10000, 1}, {20000, 2}},
+				}, {
 					lset:    labels.Labels{{Name: "a", Value: "1"}, {Name: "c", Value: "3"}, {Name: "replica", Value: "replica-1"}, {Name: "replicaA", Value: "replica-1"}},
 					samples: []sample{{10000, 1}, {20000, 2}},
 				}, {
@@ -213,12 +316,6 @@ func TestDedupSeriesSet(t *testing.T) {
 				}, {
 					lset:    labels.Labels{{Name: "a", Value: "1"}, {Name: "c", Value: "3"}, {Name: "replica", Value: "replica-3"}, {Name: "replicaA", Value: "replica-3"}},
 					samples: []sample{{200000, 5}, {210000, 6}},
-				}, {
-					lset:    labels.Labels{{Name: "a", Value: "1"}, {Name: "c", Value: "3"}, {Name: "d", Value: "4"}},
-					samples: []sample{{10000, 1}, {20000, 2}},
-				}, {
-					lset:    labels.Labels{{Name: "a", Value: "1"}, {Name: "c", Value: "3"}},
-					samples: []sample{{10000, 1}, {20000, 2}},
 				}, {
 					lset:    labels.Labels{{Name: "a", Value: "1"}, {Name: "c", Value: "4"}, {Name: "replica", Value: "replica-1"}, {Name: "replicaA", Value: "replica-1"}},
 					samples: []sample{{10000, 1}, {20000, 2}},
@@ -230,24 +327,17 @@ func TestDedupSeriesSet(t *testing.T) {
 					samples: []sample{{60000, 3}, {70000, 4}},
 				},
 			},
-			exp: []series{
+			exp: []testSeries{
 				{
 					lset:    labels.Labels{{Name: "a", Value: "1"}, {Name: "c", Value: "3"}},
 					samples: []sample{{10000, 1}, {20000, 2}, {60000, 3}, {70000, 4}, {200000, 5}, {210000, 6}},
-				},
-				{
+				}, {
 					lset:    labels.Labels{{Name: "a", Value: "1"}, {Name: "c", Value: "3"}, {Name: "d", Value: "4"}},
 					samples: []sample{{10000, 1}, {20000, 2}},
-				},
-				{
-					lset:    labels.Labels{{Name: "a", Value: "1"}, {Name: "c", Value: "3"}},
-					samples: []sample{{10000, 1}, {20000, 2}},
-				},
-				{
+				}, {
 					lset:    labels.Labels{{Name: "a", Value: "1"}, {Name: "c", Value: "4"}},
 					samples: []sample{{10000, 1}, {20000, 2}},
-				},
-				{
+				}, {
 					lset:    labels.Labels{{Name: "a", Value: "2"}, {Name: "c", Value: "3"}},
 					samples: []sample{{10000, 1}, {20000, 2}, {60000, 3}, {70000, 4}},
 				},
@@ -258,8 +348,8 @@ func TestDedupSeriesSet(t *testing.T) {
 			},
 		},
 		{
-			// Multi dedup label - some series don't have all dedup labels.
-			input: []series{
+			name: "multi dedup label - some testSeries don't have all dedup labels",
+			input: []testSeries{
 				{
 					lset:    labels.Labels{{Name: "a", Value: "1"}, {Name: "c", Value: "3"}, {Name: "replica", Value: "replica-1"}, {Name: "replicaA", Value: "replica-1"}},
 					samples: []sample{{10000, 1}, {20000, 2}},
@@ -268,7 +358,7 @@ func TestDedupSeriesSet(t *testing.T) {
 					samples: []sample{{60000, 3}, {70000, 4}},
 				},
 			},
-			exp: []series{
+			exp: []testSeries{
 				{
 					lset:    labels.Labels{{Name: "a", Value: "1"}, {Name: "c", Value: "3"}},
 					samples: []sample{{10000, 1}, {20000, 2}, {60000, 3}, {70000, 4}},
@@ -281,20 +371,20 @@ func TestDedupSeriesSet(t *testing.T) {
 		},
 		{
 			// Regression test against https://github.com/thanos-io/thanos/issues/2401.
-			// Two counter series, when one (initially chosen) series is having hiccup (few dropped samples), while second is live.
+			name: "Two counter testSeries, when one (initially chosen) testSeries is having hiccup (few dropped samples), while second is live",
 			// This also happens when 2 replicas scrape in different time (they usually do) and one sees later counter value then the other.
 			// Now, depending on what replica we look, we can see totally different counter value in total where total means
 			// after accounting for counter resets. We account for that in downsample.CounterSeriesIterator, mainly because
 			// we handle downsample Counter Aggregations specially (for detecting resets between chunks).
 			isCounter: true,
-			input: []series{
+			input: []testSeries{
 				{
 					lset: labels.Labels{{Name: "replica", Value: "01"}},
 					samples: []sample{
 						{10000, 8.0}, // Smaller timestamp, this will be chosen. CurrValue = 8.0.
 						{20000, 9.0}, // Same. CurrValue = 9.0.
 						// {Gap} app reset. No sample, because stale marker but removed by downsample.CounterSeriesIterator.
-						{50001, 9 + 1.0}, // Next after 20000+1 has a bit higher than timestamp then in second series. Penalty 5000 will be added.
+						{50001, 9 + 1.0}, // Next after 20000+1 has a bit higher than timestamp then in second testSeries. Penalty 5000 will be added.
 						{60000, 9 + 2.0},
 						{70000, 9 + 3.0},
 						{80000, 9 + 4.0},
@@ -314,7 +404,7 @@ func TestDedupSeriesSet(t *testing.T) {
 					},
 				},
 			},
-			exp: []series{
+			exp: []testSeries{
 				{
 					lset:    labels.Labels{},
 					samples: []sample{{10000, 8}, {20000, 9}, {45001, 9}, {55001, 10}, {65001, 11}, {90000, 14}, {100000, 15}},
@@ -325,9 +415,9 @@ func TestDedupSeriesSet(t *testing.T) {
 			},
 		},
 		{
-			// Same thing but not for counter should not adjust anything.
+			name:      "same thing but not for counter should not adjust anything",
 			isCounter: false,
-			input: []series{
+			input: []testSeries{
 				{
 					lset: labels.Labels{{Name: "replica", Value: "01"}},
 					samples: []sample{
@@ -340,7 +430,7 @@ func TestDedupSeriesSet(t *testing.T) {
 					},
 				},
 			},
-			exp: []series{
+			exp: []testSeries{
 				{
 					lset:    labels.Labels{},
 					samples: []sample{{10000, 8}, {20000, 9}, {45001, 8.5}, {55001, 9.5}, {65001, 10.5}, {90000, 14}, {100000, 15}},
@@ -350,9 +440,9 @@ func TestDedupSeriesSet(t *testing.T) {
 		},
 		{
 			// Regression test on real data against https://github.com/thanos-io/thanos/issues/2401.
-			// Real data with stale marker after downsample.CounterSeriesIterator (required for downsampling + rate).
+			name:      "real data with stale marker after downsample.CounterSeriesIterator (required for downsampling + rate)",
 			isCounter: true,
-			input: []series{
+			input: []testSeries{
 				{
 					lset: labels.Labels{{Name: "replica", Value: "01"}},
 					samples: []sample{
@@ -409,7 +499,7 @@ func TestDedupSeriesSet(t *testing.T) {
 					},
 				},
 			},
-			exp: []series{
+			exp: []testSeries{
 				{
 					lset:    labels.Labels{},
 					samples: expectedRealSeriesWithStaleMarkerDeduplicatedForRate,
@@ -417,11 +507,12 @@ func TestDedupSeriesSet(t *testing.T) {
 			},
 			dedupLabels: map[string]struct{}{"replica": {}},
 		},
-	}
+	} {
+		t.Run(tcase.name, func(t *testing.T) {
+			ensureSorted(t, tcase.input)
+			ensureSorted(t, tcase.exp)
 
-	for _, tcase := range tests {
-		t.Run("", func(t *testing.T) {
-			dedupSet := NewSeriesSet(&mockedSeriesSet{series: tcase.input}, tcase.dedupLabels, tcase.isCounter)
+			dedupSet := NewSeriesSet(&mockedSeriesSet{testSeries: tcase.input}, tcase.dedupLabels, tcase.isCounter)
 			var ats []storage.Series
 			for dedupSet.Next() {
 				ats = append(ats, dedupSet.At())
@@ -430,12 +521,35 @@ func TestDedupSeriesSet(t *testing.T) {
 			testutil.Equals(t, len(tcase.exp), len(ats))
 
 			for i, s := range ats {
-				testutil.Equals(t, tcase.exp[i].lset, s.Labels(), "labels mismatch for series %v", i)
+				testutil.Equals(t, tcase.exp[i].lset, s.Labels(), "labels mismatch for testSeries %v", i)
 				res := expandSeries(t, s.Iterator())
-				testutil.Equals(t, tcase.exp[i].samples, res, "values mismatch for series :%v", i)
+				testutil.Equals(t, tcase.exp[i].samples, res, "values mismatch for testSeries :%v", i)
 			}
 		})
 	}
+}
+
+func ensureSorted(t *testing.T, ser []testSeries) {
+	t.Helper()
+
+	if sort.SliceIsSorted(ser, func(i, j int) bool {
+		return labels.Compare(ser[i].lset, ser[j].lset) < 0
+	}) {
+		return
+	}
+
+	// Show diff.
+	cpy := make([]labels.Labels, len(ser))
+	cpy2 := make([]labels.Labels, len(ser))
+	for i, s := range ser {
+		cpy[i] = s.lset
+		cpy2[i] = s.lset
+	}
+
+	sort.Slice(cpy, func(i, j int) bool {
+		return labels.Compare(cpy[i], cpy[j]) < 0
+	})
+	testutil.Equals(t, cpy2, cpy)
 }
 
 func TestDedupSeriesIterator(t *testing.T) {
@@ -445,7 +559,7 @@ func TestDedupSeriesIterator(t *testing.T) {
 	cases := []struct {
 		a, b, exp []sample
 	}{
-		{ // Generally prefer the first series.
+		{ // Generally prefer the first testSeries.
 			a:   []sample{{10000, 10}, {20000, 11}, {30000, 12}, {40000, 13}},
 			b:   []sample{{10000, 20}, {20000, 21}, {30000, 22}, {40000, 23}},
 			exp: []sample{{10000, 10}, {20000, 11}, {30000, 12}, {40000, 13}},
@@ -455,7 +569,7 @@ func TestDedupSeriesIterator(t *testing.T) {
 			b:   []sample{{10000, 2}, {20000, 2}, {30000, 2}, {40000, 2}},
 			exp: []sample{{10000, 2}, {20000, 2}, {30000, 2}, {40000, 2}},
 		},
-		{ // Don't switch series on a single delta sized gap.
+		{ // Don't switch testSeries on a single delta sized gap.
 			a:   []sample{{10000, 1}, {20000, 1}, {40000, 1}},
 			b:   []sample{{10000, 2}, {20000, 2}, {30000, 2}, {40000, 2}},
 			exp: []sample{{10000, 1}, {20000, 1}, {40000, 1}},
@@ -465,7 +579,7 @@ func TestDedupSeriesIterator(t *testing.T) {
 			b:   []sample{{15000, 2}, {25000, 2}, {35000, 2}, {45000, 2}},
 			exp: []sample{{10000, 1}, {20000, 1}, {40000, 1}},
 		},
-		{ // Once the gap gets bigger than 2 deltas, switch and stay with the new series.
+		{ // Once the gap gets bigger than 2 deltas, switch and stay with the new testSeries.
 			a:   []sample{{10000, 1}, {20000, 1}, {30000, 1}, {60000, 1}, {70000, 1}},
 			b:   []sample{{10100, 2}, {20100, 2}, {30100, 2}, {40100, 2}, {50100, 2}, {60100, 2}},
 			exp: []sample{{10000, 1}, {20000, 1}, {30000, 1}, {50100, 2}, {60100, 2}},

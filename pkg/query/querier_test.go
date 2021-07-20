@@ -960,55 +960,6 @@ func TestQuerierWithDedupUnderstoodByPromQL_Rate(t *testing.T) {
 	})
 }
 
-func TestSortReplicaLabel(t *testing.T) {
-	tests := []struct {
-		input       []storepb.Series
-		exp         []storepb.Series
-		dedupLabels map[string]struct{}
-	}{
-		// 0 Single deduplication label.
-		{
-			input: []storepb.Series{
-				{Labels: []labelpb.ZLabel{{Name: "a", Value: "1"}, {Name: "b", Value: "replica-1"}, {Name: "c", Value: "3"}}},
-				{Labels: []labelpb.ZLabel{{Name: "a", Value: "1"}, {Name: "b", Value: "replica-1"}, {Name: "c", Value: "3"}, {Name: "d", Value: "4"}}},
-				{Labels: []labelpb.ZLabel{{Name: "a", Value: "1"}, {Name: "b", Value: "replica-1"}, {Name: "c", Value: "4"}}},
-				{Labels: []labelpb.ZLabel{{Name: "a", Value: "1"}, {Name: "b", Value: "replica-2"}, {Name: "c", Value: "3"}}},
-			},
-			exp: []storepb.Series{
-				{Labels: []labelpb.ZLabel{{Name: "a", Value: "1"}, {Name: "c", Value: "3"}, {Name: "b", Value: "replica-1"}}},
-				{Labels: []labelpb.ZLabel{{Name: "a", Value: "1"}, {Name: "c", Value: "3"}, {Name: "b", Value: "replica-2"}}},
-				{Labels: []labelpb.ZLabel{{Name: "a", Value: "1"}, {Name: "c", Value: "3"}, {Name: "d", Value: "4"}, {Name: "b", Value: "replica-1"}}},
-				{Labels: []labelpb.ZLabel{{Name: "a", Value: "1"}, {Name: "c", Value: "4"}, {Name: "b", Value: "replica-1"}}},
-			},
-			dedupLabels: map[string]struct{}{"b": {}},
-		},
-		// 1 Multi deduplication labels.
-		{
-			input: []storepb.Series{
-				{Labels: []labelpb.ZLabel{{Name: "a", Value: "1"}, {Name: "b", Value: "replica-1"}, {Name: "b1", Value: "replica-1"}, {Name: "c", Value: "3"}}},
-				{Labels: []labelpb.ZLabel{{Name: "a", Value: "1"}, {Name: "b", Value: "replica-1"}, {Name: "b1", Value: "replica-1"}, {Name: "c", Value: "3"}, {Name: "d", Value: "4"}}},
-				{Labels: []labelpb.ZLabel{{Name: "a", Value: "1"}, {Name: "b", Value: "replica-1"}, {Name: "b1", Value: "replica-1"}, {Name: "c", Value: "4"}}},
-				{Labels: []labelpb.ZLabel{{Name: "a", Value: "1"}, {Name: "b", Value: "replica-2"}, {Name: "b1", Value: "replica-2"}, {Name: "c", Value: "3"}}},
-				{Labels: []labelpb.ZLabel{{Name: "a", Value: "1"}, {Name: "b", Value: "replica-2"}, {Name: "c", Value: "3"}}},
-			},
-			exp: []storepb.Series{
-				{Labels: []labelpb.ZLabel{{Name: "a", Value: "1"}, {Name: "c", Value: "3"}, {Name: "b", Value: "replica-1"}, {Name: "b1", Value: "replica-1"}}},
-				{Labels: []labelpb.ZLabel{{Name: "a", Value: "1"}, {Name: "c", Value: "3"}, {Name: "b", Value: "replica-2"}}},
-				{Labels: []labelpb.ZLabel{{Name: "a", Value: "1"}, {Name: "c", Value: "3"}, {Name: "b", Value: "replica-2"}, {Name: "b1", Value: "replica-2"}}},
-				{Labels: []labelpb.ZLabel{{Name: "a", Value: "1"}, {Name: "c", Value: "3"}, {Name: "d", Value: "4"}, {Name: "b", Value: "replica-1"}, {Name: "b1", Value: "replica-1"}}},
-				{Labels: []labelpb.ZLabel{{Name: "a", Value: "1"}, {Name: "c", Value: "4"}, {Name: "b", Value: "replica-1"}, {Name: "b1", Value: "replica-1"}}},
-			},
-			dedupLabels: map[string]struct{}{"b": {}, "b1": {}},
-		},
-	}
-	for _, test := range tests {
-		t.Run("", func(t *testing.T) {
-			sortDedupLabels(test.input, test.dedupLabels)
-			testutil.Equals(t, test.exp, test.input)
-		})
-	}
-}
-
 const hackyStaleMarker = float64(-99999999)
 
 func expandSeries(t testing.TB, it chunkenc.Iterator) (res []sample) {

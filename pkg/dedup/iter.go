@@ -12,21 +12,28 @@ import (
 )
 
 type dedupSeriesSet struct {
+	// TODO(bwplotka): Consider using ChunkSeriesSet to remove identical chunks out when deduplicating.
+	// Input series are assumed to be  sorted in replica-aware order.
 	set           storage.SeriesSet
 	replicaLabels map[string]struct{}
 	isCounter     bool
 
-	replicas []storage.Series
 	lset     labels.Labels
-	peek     storage.Series
-	ok       bool
+	replicas []storage.SampleIterable
+
+	strippedPeekLset labels.Labels
+	peek             storage.SampleIterable
+
+	ok bool
 }
 
 func NewSeriesSet(set storage.SeriesSet, replicaLabels map[string]struct{}, isCounter bool) storage.SeriesSet {
-	s := &dedupSeriesSet{set: set, replicaLabels: replicaLabels, isCounter: isCounter}
+	s := &dedupSeriesSet{set: newReplicaAwareSortSet(set, replicaLabels), replicaLabels: replicaLabels, isCounter: isCounter}
 	s.ok = s.set.Next()
 	if s.ok {
-		s.peek = s.set.At()
+		peek := s.set.At()
+		s.peek = peek
+		s.strippedPeekLset = stripReplicaLset(s.replicaLabels, peek.Labels())
 	}
 	return s
 }
@@ -35,33 +42,24 @@ func (s *dedupSeriesSet) Next() bool {
 	if !s.ok {
 		return false
 	}
-	// Set the label set we are currently gathering to the peek element
-	// without the replica label if it exists.
-	s.lset = s.peekLset()
+	// Set the replica label set we are currently gathering to the peek element
+	// without the replica label.
+	s.lset = s.strippedPeekLset
 	s.replicas = append(s.replicas[:0], s.peek)
 	return s.next()
 }
 
-// peekLset returns the label set of the current peek element stripped from the
-// replica label if it exists.
-func (s *dedupSeriesSet) peekLset() labels.Labels {
-	lset := s.peek.Labels()
-	if len(s.replicaLabels) == 0 {
-		return lset
-	}
-	// Check how many replica labels are present so that these are removed.
-	var totalToRemove int
-	for i := 0; i < len(s.replicaLabels); i++ {
-		if len(lset)-i == 0 {
-			break
-		}
-
-		if _, ok := s.replicaLabels[lset[len(lset)-i-1].Name]; ok {
-			totalToRemove++
+// stripReplicaLset returns the label set stripped from the replica label.
+// NOTE(bwplotka): This modifies the underlying array slice for efficiency reasons. Do not use passed lset!
+func stripReplicaLset(replicaLabels map[string]struct{}, lset labels.Labels) labels.Labels {
+	initialLen := len(lset)
+	// Statistically those are most likely at the end, so start lookup there.
+	for i := initialLen - 1; i >= 0 && len(lset)-initialLen < len(replicaLabels); i-- {
+		if _, ok := replicaLabels[lset[i].Name]; ok {
+			lset = append(lset[:i], lset[i+1:]...)
 		}
 	}
-	// Strip all present replica labels.
-	return lset[:len(lset)-totalToRemove]
+	return lset
 }
 
 func (s *dedupSeriesSet) next() bool {
@@ -71,12 +69,13 @@ func (s *dedupSeriesSet) next() bool {
 		// There's no next series, the current replicas are the last element.
 		return len(s.replicas) > 0
 	}
+	peek := s.set.At()
 	s.peek = s.set.At()
-	nextLset := s.peekLset()
+	s.strippedPeekLset = stripReplicaLset(s.replicaLabels, peek.Labels())
 
 	// If the label set modulo the replica label is equal to the current label set
 	// look for more replicas, otherwise a series is complete.
-	if !labels.Equal(s.lset, nextLset) {
+	if !labels.Equal(s.lset, s.strippedPeekLset) {
 		return true
 	}
 	s.replicas = append(s.replicas, s.peek)
@@ -85,10 +84,11 @@ func (s *dedupSeriesSet) next() bool {
 
 func (s *dedupSeriesSet) At() storage.Series {
 	if len(s.replicas) == 1 {
-		return seriesWithLabels{Series: s.replicas[0], lset: s.lset}
+		return series{SampleIterable: s.replicas[0], lset: s.lset}
 	}
+
 	// Clients may store the series, so we must make a copy of the slice before advancing.
-	repl := make([]storage.Series, len(s.replicas))
+	repl := make([]storage.SampleIterable, len(s.replicas))
 	copy(repl, s.replicas)
 	return newDedupSeries(s.lset, repl, s.isCounter)
 }
@@ -101,21 +101,21 @@ func (s *dedupSeriesSet) Warnings() storage.Warnings {
 	return s.set.Warnings()
 }
 
-type seriesWithLabels struct {
-	storage.Series
+type series struct {
+	storage.SampleIterable
 	lset labels.Labels
 }
 
-func (s seriesWithLabels) Labels() labels.Labels { return s.lset }
+func (s series) Labels() labels.Labels { return s.lset }
 
 type dedupSeries struct {
 	lset     labels.Labels
-	replicas []storage.Series
+	replicas []storage.SampleIterable
 
 	isCounter bool
 }
 
-func newDedupSeries(lset labels.Labels, replicas []storage.Series, isCounter bool) *dedupSeries {
+func newDedupSeries(lset labels.Labels, replicas []storage.SampleIterable, isCounter bool) *dedupSeries {
 	return &dedupSeries{lset: lset, isCounter: isCounter, replicas: replicas}
 }
 

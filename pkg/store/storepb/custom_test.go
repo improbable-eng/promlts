@@ -327,6 +327,8 @@ func TestMergeSeriesSets(t *testing.T) {
 		},
 	} {
 		t.Run(tcase.desc, func(t *testing.T) {
+			ensureEachSetIsSorted(t, tcase.in) // Make sure input makes sense. We expect input series from each set to be sorted.
+
 			var input []SeriesSet
 			for _, iss := range tcase.in {
 				input = append(input, newListSeriesSet(t, iss))
@@ -334,6 +336,29 @@ func TestMergeSeriesSets(t *testing.T) {
 			testutil.Equals(t, tcase.expected, expandSeriesSet(t, MergeSeriesSets(input...)))
 		})
 	}
+}
+
+func ensureEachSetIsSorted(t *testing.T, ser [][]rawSeries) {
+	t.Helper()
+
+	cpy := make([][]labels.Labels, len(ser))
+	cpy2 := make([][]labels.Labels, len(ser))
+	for i, s := range ser {
+		cpy[i] = make([]labels.Labels, len(s))
+		cpy2[i] = make([]labels.Labels, len(s))
+		for j, l := range s {
+			cpy[i][j] = l.lset
+			cpy2[i][j] = l.lset
+		}
+	}
+
+	// Sort cpy and show diff.
+	for _, s := range cpy {
+		sort.Slice(s, func(i, j int) bool {
+			return labels.Compare(s[i], s[j]) < 0
+		})
+	}
+	testutil.Equals(t, cpy2, cpy)
 }
 
 func TestMergeSeriesSetError(t *testing.T) {

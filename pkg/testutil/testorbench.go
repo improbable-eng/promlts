@@ -4,7 +4,12 @@
 package testutil
 
 import (
+	"os"
+	"path/filepath"
+	"runtime/pprof"
 	"testing"
+
+	"github.com/thanos-io/thanos/pkg/runutil"
 )
 
 // TB represents union of test and benchmark.
@@ -82,4 +87,22 @@ func (t *tb) ResetTimer() {
 func (t *tb) IsBenchmark() bool {
 	_, ok := t.TB.(*testing.B)
 	return ok
+}
+
+// WriteHeapProfile creates heap profile that snapshots all the allocations from the beginning of program run (with rate
+// configured by runtime.MemProfileRate). It will also record currently inuse objects.
+// NOTE: Manually instrumented heap profile can be superior to mem profile configured using `go test` because you can decide in
+// what moment to do it. This allows to check if resources are cleaned after the test case etc.
+// NOTE: It's adviced to run `runtime.GC()` before this to ensure you have clean view what would be cleaned on next GC run.
+func WriteHeapProfile(path string) (err error) {
+	if err := os.MkdirAll(filepath.Dir(path), os.ModePerm); err != nil {
+		return err
+	}
+
+	f, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer runutil.CloseWithErrCapture(&err, f, "close")
+	return pprof.WriteHeapProfile(f)
 }

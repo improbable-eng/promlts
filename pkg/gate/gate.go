@@ -28,6 +28,13 @@ var (
 	}
 )
 
+func NewNoop() Gate { return noop{} }
+
+type noop struct{}
+
+func (noop) Start(_ context.Context) error { return nil }
+func (noop) Done()                         {}
+
 // Gate controls the maximum number of concurrently running and waiting queries.
 //
 // Example of use:
@@ -94,13 +101,6 @@ func New(reg prometheus.Registerer, maxConcurrent int) Gate {
 		),
 	)
 }
-
-type noopGate struct{}
-
-func (noopGate) Start(context.Context) error { return nil }
-func (noopGate) Done()                       {}
-
-func NewNoop() Gate { return noopGate{} }
 
 type instrumentedDurationGate struct {
 	g        Gate

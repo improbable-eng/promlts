@@ -5,7 +5,6 @@ package query
 
 import (
 	"context"
-	"sort"
 	"strings"
 	"time"
 
@@ -22,7 +21,6 @@ import (
 	"github.com/thanos-io/thanos/pkg/extprom"
 	"github.com/thanos-io/thanos/pkg/gate"
 	"github.com/thanos-io/thanos/pkg/store"
-	"github.com/thanos-io/thanos/pkg/store/labelpb"
 	"github.com/thanos-io/thanos/pkg/store/storepb"
 	"github.com/thanos-io/thanos/pkg/tracing"
 )
@@ -86,7 +84,7 @@ type querier struct {
 	mint, maxt          int64
 	replicaLabels       map[string]struct{}
 	storeDebugMatchers  [][]*labels.Matcher
-	proxy               storepb.StoreServer
+	proxy               storepb.StoreClient
 	deduplicate         bool
 	maxResolutionMillis int64
 	partialResponse     bool
@@ -130,7 +128,7 @@ func newQuerier(
 		maxt:                maxt,
 		replicaLabels:       rl,
 		storeDebugMatchers:  storeDebugMatchers,
-		proxy:               proxy,
+		proxy:               storepb.ServerAsClient(proxy, 0),
 		deduplicate:         deduplicate,
 		maxResolutionMillis: maxResolutionMillis,
 		partialResponse:     partialResponse,
@@ -140,34 +138,6 @@ func newQuerier(
 
 func (q *querier) isDedupEnabled() bool {
 	return q.deduplicate && len(q.replicaLabels) > 0
-}
-
-type seriesServer struct {
-	// This field just exist to pseudo-implement the unused methods of the interface.
-	storepb.Store_SeriesServer
-	ctx context.Context
-
-	seriesSet []storepb.Series
-	warnings  []string
-}
-
-func (s *seriesServer) Send(r *storepb.SeriesResponse) error {
-	if r.GetWarning() != "" {
-		s.warnings = append(s.warnings, r.GetWarning())
-		return nil
-	}
-
-	if r.GetSeries() != nil {
-		s.seriesSet = append(s.seriesSet, *r.GetSeries())
-		return nil
-	}
-
-	// Unsupported field, skip.
-	return nil
-}
-
-func (s *seriesServer) Context() context.Context {
-	return s.ctx
 }
 
 // aggrsFromFunc infers aggregates of the underlying data based on the wrapping
@@ -255,6 +225,7 @@ func (q *querier) Select(_ bool, hints *storage.SelectHints, ms ...*labels.Match
 	}}
 }
 
+// TODO(bwplotka): We could reduce the samples we return based on resolution hint. PromQL only uses certain resolution.
 func (q *querier) selectFn(ctx context.Context, hints *storage.SelectHints, ms ...*labels.Matcher) (storage.SeriesSet, error) {
 	sms, err := storepb.PromMatchersToMatchers(ms...)
 	if err != nil {
@@ -263,12 +234,8 @@ func (q *querier) selectFn(ctx context.Context, hints *storage.SelectHints, ms .
 
 	aggrs := aggrsFromFunc(hints.Func)
 
-	// TODO(bwplotka): Pass it using the SeriesRequest instead of relying on context.
 	ctx = context.WithValue(ctx, store.StoreMatcherKey, q.storeDebugMatchers)
-
-	// TODO(bwplotka): Use inprocess gRPC.
-	resp := &seriesServer{ctx: ctx}
-	if err := q.proxy.Series(&storepb.SeriesRequest{
+	client, err := q.proxy.Series(ctx, &storepb.SeriesRequest{
 		MinTime:                 hints.Start,
 		MaxTime:                 hints.End,
 		Matchers:                sms,
@@ -276,61 +243,19 @@ func (q *querier) selectFn(ctx context.Context, hints *storage.SelectHints, ms .
 		Aggregates:              aggrs,
 		PartialResponseDisabled: !q.partialResponse,
 		SkipChunks:              q.skipChunks,
-	}, resp); err != nil {
-		return nil, errors.Wrap(err, "proxy Series()")
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "start proxy Series()")
 	}
 
-	var warns storage.Warnings
-	for _, w := range resp.warnings {
-		warns = append(warns, errors.New(w))
-	}
-
+	set := newPromSeriesSet(client, q.mint, q.maxt, aggrs)
 	if !q.isDedupEnabled() {
 		// Return data without any deduplication.
-		return &promSeriesSet{
-			mint:  q.mint,
-			maxt:  q.maxt,
-			set:   newStoreSeriesSet(resp.seriesSet),
-			aggrs: aggrs,
-			warns: warns,
-		}, nil
-	}
-
-	// TODO(fabxc): this could potentially pushed further down into the store API to make true streaming possible.
-	sortDedupLabels(resp.seriesSet, q.replicaLabels)
-	set := &promSeriesSet{
-		mint:  q.mint,
-		maxt:  q.maxt,
-		set:   newStoreSeriesSet(resp.seriesSet),
-		aggrs: aggrs,
-		warns: warns,
+		return set, nil
 	}
 
 	// The merged series set assembles all potentially-overlapping time ranges of the same series into a single one.
-	// TODO(bwplotka): We could potentially dedup on chunk level, use chunk iterator for that when available.
 	return dedup.NewSeriesSet(set, q.replicaLabels, len(aggrs) == 1 && aggrs[0] == storepb.Aggr_COUNTER), nil
-}
-
-// sortDedupLabels re-sorts the set so that the same series with different replica
-// labels are coming right after each other.
-func sortDedupLabels(set []storepb.Series, replicaLabels map[string]struct{}) {
-	for _, s := range set {
-		// Move the replica labels to the very end.
-		sort.Slice(s.Labels, func(i, j int) bool {
-			if _, ok := replicaLabels[s.Labels[i].Name]; ok {
-				return false
-			}
-			if _, ok := replicaLabels[s.Labels[j].Name]; ok {
-				return true
-			}
-			return s.Labels[i].Name < s.Labels[j].Name
-		})
-	}
-	// With the re-ordered label sets, re-sorting all series aligns the same series
-	// from different replicas sequentially.
-	sort.Slice(set, func(i, j int) bool {
-		return labels.Compare(labelpb.ZLabelsToPromLabels(set[i].Labels), labelpb.ZLabelsToPromLabels(set[j].Labels)) < 0
-	})
 }
 
 // LabelValues returns all potential values for a label name.
@@ -338,14 +263,12 @@ func (q *querier) LabelValues(name string, matchers ...*labels.Matcher) ([]strin
 	span, ctx := tracing.StartSpan(q.ctx, "querier_label_values")
 	defer span.Finish()
 
-	// TODO(bwplotka): Pass it using the SeriesRequest instead of relying on context.
-	ctx = context.WithValue(ctx, store.StoreMatcherKey, q.storeDebugMatchers)
-
 	pbMatchers, err := storepb.PromMatchersToMatchers(matchers...)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "convert matchers")
 	}
 
+	ctx = context.WithValue(ctx, store.StoreMatcherKey, q.storeDebugMatchers)
 	resp, err := q.proxy.LabelValues(ctx, &storepb.LabelValuesRequest{
 		Label:                   name,
 		PartialResponseDisabled: !q.partialResponse,
@@ -370,9 +293,7 @@ func (q *querier) LabelNames() ([]string, storage.Warnings, error) {
 	span, ctx := tracing.StartSpan(q.ctx, "querier_label_names")
 	defer span.Finish()
 
-	// TODO(bwplotka): Pass it using the SeriesRequest instead of relying on context.
 	ctx = context.WithValue(ctx, store.StoreMatcherKey, q.storeDebugMatchers)
-
 	resp, err := q.proxy.LabelNames(ctx, &storepb.LabelNamesRequest{
 		PartialResponseDisabled: !q.partialResponse,
 		Start:                   q.mint,

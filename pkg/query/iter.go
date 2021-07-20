@@ -4,7 +4,7 @@
 package query
 
 import (
-	"sort"
+	"io"
 
 	"github.com/pkg/errors"
 	"github.com/prometheus/prometheus/pkg/labels"
@@ -16,120 +16,90 @@ import (
 	"github.com/thanos-io/thanos/pkg/store/storepb"
 )
 
-// promSeriesSet implements the SeriesSet interface of the Prometheus storage
-// package on top of our storepb SeriesSet.
+// promSeriesSet implements the SeriesSet interface of the Prometheus storage package on
+// top of gRPC storepb.Store_SeriesClient.
+// NOTE: This is a hot path. Keep it heavily efficient.
 type promSeriesSet struct {
-	set  storepb.SeriesSet
-	done bool
+	client storepb.Store_SeriesClient
+	// err stores last error or EOF if no more results.
+	err error
 
 	mint, maxt int64
 	aggrs      []storepb.Aggr
-	initiated  bool
 
-	currLset   labels.Labels
-	currChunks []storepb.AggrChunk
+	curr *storepb.Series
+	at   *storepb.Series
 
 	warns storage.Warnings
 }
 
-func (s *promSeriesSet) Next() bool {
-	if !s.initiated {
-		s.initiated = true
-		s.done = s.set.Next()
+func newPromSeriesSet(client storepb.Store_SeriesClient, mint, maxt int64, aggrs []storepb.Aggr) *promSeriesSet {
+	return &promSeriesSet{
+		client: client,
+		mint:   mint,
+		maxt:   maxt,
+		aggrs:  aggrs,
 	}
+}
 
-	if !s.done {
+func (s *promSeriesSet) Next() bool {
+	if s.err != nil {
 		return false
 	}
 
-	// storage.Series are more strict then SeriesSet:
-	// * It requires storage.Series to iterate over full series.
-	s.currLset, s.currChunks = s.set.At()
 	for {
-		s.done = s.set.Next()
-		if !s.done {
-			break
+		// We assume implementation is listening on context cancellation.
+		resp, err := s.client.Recv()
+		if err != nil {
+			s.err = err
+			if s.err != io.EOF || s.curr == nil {
+				return false
+			}
+			s.at = s.curr
+			return true
 		}
-		nextLset, nextChunks := s.set.At()
-		if labels.Compare(s.currLset, nextLset) != 0 {
-			break
-		}
-		s.currChunks = append(s.currChunks, nextChunks...)
-	}
 
-	// Samples (so chunks as well) have to be sorted by time.
-	// TODO(bwplotka): Benchmark if we can do better.
-	// For example we could iterate in above loop and write our own binary search based insert sort.
-	// We could also remove duplicates in same loop.
-	sort.Slice(s.currChunks, func(i, j int) bool {
-		return s.currChunks[i].MinTime < s.currChunks[j].MinTime
-	})
-
-	// Proxy handles duplicates between different series, let's handle duplicates within single series now as well.
-	// We don't need to decode those.
-	s.currChunks = removeExactDuplicates(s.currChunks)
-	return true
-}
-
-// removeExactDuplicates returns chunks without 1:1 duplicates.
-// NOTE: input chunks has to be sorted by minTime.
-func removeExactDuplicates(chks []storepb.AggrChunk) []storepb.AggrChunk {
-	if len(chks) <= 1 {
-		return chks
-	}
-
-	ret := make([]storepb.AggrChunk, 0, len(chks))
-	ret = append(ret, chks[0])
-
-	for _, c := range chks[1:] {
-		if ret[len(ret)-1].Compare(c) == 0 {
+		if resp.GetSeries() == nil {
+			if w := resp.GetWarning(); w != "" {
+				s.warns = append(s.warns, errors.New(w))
+			}
+			// Hint of other type of message. Ignore for forward compatibility.
 			continue
 		}
-		ret = append(ret, c)
+
+		// storage.Series are more strict then SeriesSet, it requires storage.Series to iterate over full series.
+		// Yet, we use storepb.Proxy code which concatenates same series into one response. (See storepb.mergedSeriesSet).
+		if s.curr == nil {
+			s.curr = resp.GetSeries()
+			continue
+		}
+		if labels.Compare(s.curr.PromLabels(), resp.GetSeries().PromLabels()) == 0 {
+			s.err = errors.Errorf("detected failed invariant, the same series %v in different storepb frames.", s.curr.PromLabels())
+			return false
+		}
+
+		s.at = s.curr
+		s.curr = resp.GetSeries()
+		return true
 	}
-	return ret
 }
 
 func (s *promSeriesSet) At() storage.Series {
-	if !s.initiated || s.set.Err() != nil {
+	if s.at == nil {
 		return nil
 	}
-	return newChunkSeries(s.currLset, s.currChunks, s.mint, s.maxt, s.aggrs)
+	return newChunkSeries(s.at.PromLabels(), s.at.Chunks, s.mint, s.maxt, s.aggrs)
 }
 
 func (s *promSeriesSet) Err() error {
-	return s.set.Err()
+	if s.err == io.EOF {
+		return nil
+	}
+	return s.err
 }
 
 func (s *promSeriesSet) Warnings() storage.Warnings {
 	return s.warns
-}
-
-// storeSeriesSet implements a storepb SeriesSet against a list of storepb.Series.
-type storeSeriesSet struct {
-	// TODO(bwplotka): Don't buffer all, we have to buffer single series (to sort and dedup chunks), but nothing more.
-	series []storepb.Series
-	i      int
-}
-
-func newStoreSeriesSet(s []storepb.Series) *storeSeriesSet {
-	return &storeSeriesSet{series: s, i: -1}
-}
-
-func (s *storeSeriesSet) Next() bool {
-	if s.i >= len(s.series)-1 {
-		return false
-	}
-	s.i++
-	return true
-}
-
-func (storeSeriesSet) Err() error {
-	return nil
-}
-
-func (s storeSeriesSet) At() (labels.Labels, []storepb.AggrChunk) {
-	return s.series[s.i].PromLabels(), s.series[s.i].Chunks
 }
 
 // chunkSeries implements storage.Series for a series on storepb types.

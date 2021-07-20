@@ -36,6 +36,7 @@ import (
 	"github.com/prometheus/prometheus/tsdb"
 	"github.com/prometheus/prometheus/tsdb/chunkenc"
 	"github.com/prometheus/prometheus/tsdb/encoding"
+	"github.com/thanos-io/thanos/pkg/gate"
 	"go.uber.org/atomic"
 
 	"github.com/thanos-io/thanos/pkg/block"

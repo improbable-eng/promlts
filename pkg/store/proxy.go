@@ -31,22 +31,22 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-type ctxKey int
+type ctxKey struct{}
 
-// StoreMatcherKey is the context key for the store's allow list.
-const StoreMatcherKey = ctxKey(0)
+var (
+	// StoreMatcherKey is the context key for the store's allow list.
+	StoreMatcherKey = ctxKey{}
+)
 
 // Client holds meta information about a store.
 type Client interface {
-	// Client to access the store.
+	// StoreClient to access the store.
 	storepb.StoreClient
-
 	// LabelSets that each apply to some data exposed by the backing store.
 	LabelSets() []labels.Labels
-
-	// Minimum and maximum time range of data in the store.
+	// TimeRange returns a minimum and maximum time range of data in the store.
 	TimeRange() (mint int64, maxt int64)
-
+	// String returns human readable client name for debugging purposes.
 	String() string
 	// Addr returns address of a Client.
 	Addr() string
@@ -189,7 +189,7 @@ func (s cancelableRespSender) send(r *storepb.SeriesResponse) {
 // stores and proxied to RPC client. NOTE: Resulted data are not trimmed exactly to min and max time range.
 func (s *ProxyStore) Series(r *storepb.SeriesRequest, srv storepb.Store_SeriesServer) error {
 	// TODO(bwplotka): This should be part of request logger, otherwise it does not make much sense. Also, could be
-	// tiggered by tracing span to reduce cognitive load.
+	// triggered by tracing span to reduce cognitive load.
 	reqLogger := log.With(s.logger, "component", "proxy", "request", r.String())
 
 	match, matchers, err := matchesExternalLabels(r.Matchers, s.selectorLabels)
@@ -281,12 +281,12 @@ func (s *ProxyStore) Series(r *storepb.SeriesRequest, srv storepb.Store_SeriesSe
 			return nil
 		}
 
-		// TODO(bwplotka): Currently we stream into big frames. Consider ensuring 1MB maximum.
-		// This however does not matter much when used with QueryAPI. Matters for federated Queries a lot.
-		// https://github.com/thanos-io/thanos/issues/2332
-		// Series are not necessarily merged across themselves.
 		mergedSet := storepb.MergeSeriesSets(seriesSet...)
 		for mergedSet.Next() {
+			// TODO(bwplotka): Currently we stream into big frames. Consider ensuring 1MB maximum.
+			// This however does not matter much when used with QueryAPI. Matters for federated Queries a lot.
+			// https://github.com/thanos-io/thanos/issues/2332
+			// Series are not necessarily merged across themselves.
 			lset, chk := mergedSet.At()
 			respSender.send(storepb.NewSeriesResponse(&storepb.Series{Labels: labelpb.ZLabelsFromPromLabels(lset), Chunks: chk}))
 		}

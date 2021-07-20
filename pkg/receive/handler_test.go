@@ -13,9 +13,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"path/filepath"
-	"runtime"
-	"runtime/pprof"
 	"strings"
 	"sync"
 	"testing"
@@ -1281,22 +1278,4 @@ func benchmarkHandlerMultiTSDBReceiveRemoteWrite(b testutil.TB) {
 			})
 		})
 	}
-
-	runtime.GC()
-	// Take snapshot at the end to reveal how much memory we keep in TSDB.
-	testutil.Ok(b, Heap("../../../_dev/thanos/2021/receive2"))
-
-}
-
-func Heap(dir string) (err error) {
-	if err := os.MkdirAll(dir, os.ModePerm); err != nil {
-		return err
-	}
-
-	f, err := os.Create(filepath.Join(dir, "errimpr1-go1.16.3.pprof"))
-	if err != nil {
-		return err
-	}
-	defer runutil.CloseWithErrCapture(&err, f, "close")
-	return pprof.WriteHeapProfile(f)
 }

@@ -46,6 +46,7 @@ type HeadGenOptions struct {
 
 	WithWAL       bool
 	PrependLabels labels.Labels
+	AppendLabels  labels.Labels
 	SkipChunks    bool // Skips chunks in returned slice (not in generated head!).
 
 	Random *rand.Rand
@@ -121,7 +122,7 @@ func CreateHeadWithSeries(t testing.TB, j int, opts HeadGenOptions) (*tsdb.Head,
 	all := allPostings(t, ir)
 	for all.Next() {
 		testutil.Ok(t, ir.Series(all.At(), &lset, &chunkMetas))
-		expected = append(expected, &storepb.Series{Labels: labelpb.ZLabelsFromPromLabels(append(opts.PrependLabels.Copy(), lset...))})
+		expected = append(expected, &storepb.Series{Labels: labelpb.ZLabelsFromPromLabels(append(opts.PrependLabels.Copy(), append(lset, opts.AppendLabels.Copy()...)...))})
 
 		if opts.SkipChunks {
 			continue
@@ -195,18 +196,9 @@ func RunSeriesInterestingCases(t testutil.TB, maxSamples, maxSeries int, f func(
 		samplesPerSeries int
 		series           int
 	}{
-		{
-			samplesPerSeries: 1,
-			series:           maxSeries,
-		},
-		{
-			samplesPerSeries: maxSamples / (maxSeries / 10),
-			series:           maxSeries / 10,
-		},
-		{
-			samplesPerSeries: maxSamples,
-			series:           1,
-		},
+		{samplesPerSeries: 1, series: maxSeries},
+		{samplesPerSeries: maxSamples / (maxSeries / 10), series: maxSeries / 10},
+		{samplesPerSeries: maxSamples, series: 1},
 	} {
 		if ok := t.Run(fmt.Sprintf("%dSeriesWith%dSamples", tc.series, tc.samplesPerSeries), func(t testutil.TB) {
 			f(t, tc.samplesPerSeries, tc.series)
