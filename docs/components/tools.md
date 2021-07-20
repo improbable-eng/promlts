@@ -439,7 +439,9 @@ Flags:
                              Path to YAML file that contains object store
                              configuration. See format details:
                              https://thanos.io/tip/thanos/storage.md/#configuration
-  -l, --selector=<name>=\"<value>\" ...  
+      --output=table         Output format for result. Currently supports table,
+                             cvs, tsv.
+  -l, --selector=<name>=\"<value>\" ...
                              Selects blocks based on label, e.g. '-l
                              key1=\"value1\" -l key2=\"value2\"'. All key value
                              pairs must match.
