@@ -9,8 +9,8 @@ const stringify = (map: LabelSet): string => {
 };
 
 export const isOverlapping = (a: Block, b: Block): boolean => {
-  if (a.minTime <= b.minTime) return b.minTime < a.maxTime;
-  else return a.minTime < b.maxTime;
+  if (a?.minTime <= b?.minTime) return b?.minTime < a?.maxTime;
+  else return a?.minTime < b?.maxTime;
 };
 
 const determineRow = (block: Block, rows: Block[][], startWithRow: number): number => {
@@ -102,4 +102,29 @@ export const download = (blob: Block): string => {
   const url = window.URL.createObjectURL(new Blob([JSON.stringify(blob, null, 2)], { type: 'application/json' }));
 
   return url;
+};
+
+export const getOverlappingBlocks = (blockPools: { [source: string]: BlocksPool }): Set<string> => {
+  let result: Set<string> = new Set();
+
+  Object.keys(blockPools).forEach((pk) => {
+    let blocks = Object.values(blockPools[pk]);
+    for (let i = 0; i < blocks.length; i++) {
+      if (blocks[i].length <= 1) {
+        continue;
+      }
+      for (let j = 0; j < blocks[i].length - 1; j++) {
+        for (let k = 0; k < blocks[i][j].length; k++) {
+          for (let l = 0; l < blocks[i][j + 1].length; l++) {
+            if (isOverlapping(blocks[i][j][k], blocks[i][j + 1][l])) {
+              result.add(blocks[i][j][k].ulid);
+              result.add(blocks[i][j + 1][l].ulid);
+            }
+          }
+        }
+      }
+    }
+  });
+
+  return result;
 };
