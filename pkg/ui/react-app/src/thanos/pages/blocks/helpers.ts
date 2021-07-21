@@ -126,21 +126,5 @@ export const getOverlappingBlocks = (blockPools: { [source: string]: BlocksPool 
     }
   });
 
-  // for (let i = 0; i < blocks.length; i++) {
-  //   if (blocks[i].length <= 1) {
-  //     continue;
-  //   }
-  //   for (let j = 0; j < blocks[i].length - 1; j++) {
-  //     for (let k = 0; k < blocks[i][j].length; k++) {
-  //       for (let l = 0; l < blocks[i][j + 1].length; l++) {
-  //         if (isOverlapping(blocks[i][j][k], blocks[i][j + 1][l])) {
-  //           result.add(blocks[i][j][k].ulid);
-  //           result.add(blocks[i][j + 1][l].ulid);
-  //         }
-  //       }
-  //     }
-  //   }
-  // }
-
   return result;
 };
