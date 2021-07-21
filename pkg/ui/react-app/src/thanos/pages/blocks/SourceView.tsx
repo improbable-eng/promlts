@@ -8,12 +8,25 @@ export const BlocksRow: FC<{
   gridMinTime: number;
   gridMaxTime: number;
   selectBlock: React.Dispatch<React.SetStateAction<Block | undefined>>;
-}> = ({ blocks, gridMinTime, gridMaxTime, selectBlock }) => {
+  overlappingBlocksId: Set<string>;
+  findOverlapBlock: boolean;
+}> = ({ blocks, gridMinTime, gridMaxTime, selectBlock, overlappingBlocksId, findOverlapBlock }) => {
   return (
     <div className={styles.row}>
-      {blocks.map<JSX.Element>((b) => (
-        <BlockSpan selectBlock={selectBlock} block={b} gridMaxTime={gridMaxTime} gridMinTime={gridMinTime} key={b.ulid} />
-      ))}
+      {blocks.map<JSX.Element | null>((b) => {
+        if (overlappingBlocksId.has(b.ulid) || !findOverlapBlock) {
+          return (
+            <BlockSpan
+              selectBlock={selectBlock}
+              block={b}
+              gridMaxTime={gridMaxTime}
+              gridMinTime={gridMinTime}
+              key={b.ulid}
+            />
+          );
+        }
+        return null;
+      })}
     </div>
   );
 };
@@ -24,9 +37,19 @@ export interface SourceViewProps {
   gridMinTime: number;
   gridMaxTime: number;
   selectBlock: React.Dispatch<React.SetStateAction<Block | undefined>>;
+  findOverlapBlock: boolean;
+  overlapBlocks: Set<string>;
 }
 
-export const SourceView: FC<SourceViewProps> = ({ data, title, gridMaxTime, gridMinTime, selectBlock }) => {
+export const SourceView: FC<SourceViewProps> = ({
+  data,
+  title,
+  gridMaxTime,
+  gridMinTime,
+  selectBlock,
+  findOverlapBlock,
+  overlapBlocks,
+}) => {
   return (
     <>
       <div className={styles.source}>
@@ -43,6 +66,8 @@ export const SourceView: FC<SourceViewProps> = ({ data, title, gridMaxTime, grid
                   key={`${k}-${i}`}
                   gridMaxTime={gridMaxTime}
                   gridMinTime={gridMinTime}
+                  findOverlapBlock={findOverlapBlock}
+                  overlappingBlocksId={overlapBlocks}
                 />
               ))}
             </React.Fragment>
